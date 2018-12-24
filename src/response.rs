@@ -155,7 +155,7 @@ fn usage(command: &str) -> String {
     if command == "auth" {
         args("level user")
     } else if command == "forget" {
-        noargs
+        args("user")
     } else if command == "help" {
         args("command")
     } else if command == "hug" {
