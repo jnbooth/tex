@@ -7,7 +7,7 @@ mod wikipedia;
 
 const COLOR_DEBUG: u8 = 34;
 const COLOR_ECHO: u8 = 32;
-const COLOR_UNAUTHORIZED: u8 = 31;
+const COLOR_WARN: u8 = 33;
 const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
 pub fn respond(
@@ -62,10 +62,7 @@ fn send_action(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcErr
 }
 
 fn unauthorized(user: &str, command: &str) {
-    log(
-        COLOR_UNAUTHORIZED, 
-        &format!("{} attempted to use an unauthorized command: {}!", user, command)
-    )
+    log(COLOR_WARN, &format!("{} attempted to use an unauthorized command: {}!", user, command))
 }
 
 fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {

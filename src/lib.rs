@@ -9,6 +9,7 @@ extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
 extern crate simple_error;
+extern crate xmlrpc;
 
 use irc::client::prelude::*;
 use irc::error::IrcError;
@@ -19,6 +20,7 @@ mod db;
 mod models;
 mod response;
 mod schema;
+mod wikidot;
 
 use self::db::*;
 
@@ -52,9 +54,10 @@ fn handler(db: &mut Db, client: &IrcClient, message: Message) -> Result<(), IrcE
     let m_target = message.response_target().to_owned();
     match (m_prefix, m_target, message.command.to_owned()) {
         (Some(prefix), Some(target), Command::PRIVMSG(_, msg)) => {
-            let source = prefix.split("!").next().unwrap();
-            for command in get_commands(&msg) {
-                response::respond(db, &client, &source, &target, &command)?
+            if let Some(source) = prefix.split("!").next() {
+                for command in get_commands(&msg) {
+                    response::respond(db, &client, &source, &target, &command)?
+                }
             }
         },
         _ => ()
