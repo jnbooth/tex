@@ -26,13 +26,13 @@ pub fn respond(
     };
     if command == "auth" {
         match parse_auth(&content) {
-            None => Ok(()),
+            None => send_reply(client, target, source, &usage(&command)),
             Some((auth, nick)) => {
                 if db.auth(auth + 1, source) && db.outranks(source, nick) {
                     log_db(db.add_user(auth, nick));
                     send_reply(client, target, source, &format!("Promoting {} to rank {}.", nick, auth))
                 } else {
-                    Ok(unauthorized(&source, &message))
+                    Ok(unauthorized(source, message))
                 }
             }
         }
@@ -49,19 +49,23 @@ pub fn respond(
                         send_reply(client, target, source, &format!("I don't know {}.", content)),
             }
         } else {
-            Ok(unauthorized(&source, &message))
+            Ok(unauthorized(source, message))
         }
+    }
+
+    else if command == "help" {
+        send_reply(client, target, source, &usage(&content))
     }
     
     else if command == "hug" {
-        send_action(&client, target, &format!("hugs {}.", source))
+        send_action(client, target, &format!("hugs {}.", source))
     } 
     
     else if command == "quit" {
         if db.auth(3, source) {
             client.send_quit("Shutting down, bleep bloop.".to_owned())
         } else {
-            Ok(unauthorized(&source, &message))
+            Ok(unauthorized(source, message))
         }
     } 
     
@@ -71,7 +75,7 @@ pub fn respond(
             db.reload();
             send_privmsg(client, target, "Properties reloaded.")
         } else {
-            Ok(unauthorized(&source, &message))
+            Ok(unauthorized(source, message))
         }
     } 
     
@@ -91,6 +95,30 @@ pub fn respond(
     
     else {
         Ok(())
+    }
+}
+
+fn usage(command: &str) -> String {
+    let noargs = format!("Usage: [{}]", command);
+    let args = |xs| format!("Usage: [{} {}]", command, xs);
+    if command == "auth" {
+        args("level user")
+    } else if command == "forget" {
+        noargs
+    } else if command == "help" {
+        args("command")
+    } else if command == "hug" {
+        noargs
+    } else if command == "quit" {
+        noargs
+    } else if command == "reload" {
+        noargs
+    } else if "wikipedia".starts_with(&command) {
+        args("article")
+    } else if "zyn".starts_with(&command) {
+        noargs
+    } else {
+        "I'm sorry, I don't know that command.".to_owned()
     }
 }
 
