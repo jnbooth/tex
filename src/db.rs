@@ -12,16 +12,13 @@ pub struct Db {
     conn: PgConnection,
     pub props: HashMap<String, String>,
     pub users: HashMap<String, User>,
-    pub wiki: Wikidot
+    pub wiki: Option<Wikidot>
 }
 
 impl Db {
     pub fn new() -> Db {
         let conn = establish_connection();
-        let props = load_props(&conn);
-        let users = load_users(&conn);
-        let wiki = Wikidot::new(&from_env("WIKIDOT_USER"), &from_env("WIKIDOT_KEY"));
-        Db { conn, props, users, wiki }
+        Db { props: load_props(&conn), users: load_users(&conn), wiki: Wikidot::new(), conn }
     }
 
     pub fn auth(&self, level: i32, user: &str) -> bool {

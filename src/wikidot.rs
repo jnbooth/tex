@@ -1,4 +1,5 @@
 use simple_error::SimpleError;
+use std::env;
 use xmlrpc::Request;
 use xmlrpc::Value;
 use super::IO;
@@ -8,8 +9,10 @@ pub struct Wikidot {
 }
 
 impl Wikidot {
-    pub fn new(user: &str, key: &str) -> Wikidot {
-        Wikidot { url: format!("https://{}:{}@www.wikidot.com/xml-rpc-api.php", user, key) }
+    pub fn new() -> Option<Wikidot> {
+        let user = env::var("WIKIDOT_USER").ok()?;
+        let key = env::var("WIKIDOT_KEY").ok()?;
+        Some(Wikidot { url: format!("https://{}:{}@www.wikidot.com/xml-rpc-api.php", user, key) })
     }
     
     fn xml_rpc(&self, method: &str, params: Vec<(&str, Value)>) -> Result<Value, xmlrpc::Error> {
