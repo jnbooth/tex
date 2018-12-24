@@ -31,7 +31,7 @@ pub fn respond(
     } else if command == "reload" {
         if db.auth(4, source) {
             log(COLOR_DEBUG, "Reloading properties.");
-            db.load();
+            db.reload();
             send_privmsg(client, target, "Properties reloaded.")
         } else {
             unauthorized(&source, &message);

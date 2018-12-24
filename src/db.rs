@@ -32,7 +32,7 @@ impl Db {
         }
     }
 
-    fn reload(&mut self) {
+    pub fn reload(&mut self) {
         self.props = load_props(&self.conn);
         self.users = load_users(&self.conn);
         self.wiki = load_wiki(&self.props);
