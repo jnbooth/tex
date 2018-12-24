@@ -25,6 +25,15 @@ table! {
 }
 
 table! {
+    reminder (id) {
+        id -> Int4,
+        nick -> Varchar,
+        when -> Timestamp,
+        message -> Varchar,
+    }
+}
+
+table! {
     silence (id) {
         id -> Int4,
         command -> Varchar,
@@ -54,6 +63,7 @@ allow_tables_to_appear_in_same_query!(
     ban,
     page,
     property,
+    reminder,
     silence,
     tell,
     user,

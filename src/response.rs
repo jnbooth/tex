@@ -24,36 +24,78 @@ pub fn respond(
             (command.to_lowercase(), content[1..].to_string())
         }
     };
-    if command == "hug" {
+    if command == "auth" {
+        match parse_auth(&content) {
+            None => Ok(()),
+            Some((auth, nick)) => {
+                if db.auth(auth + 1, source) && db.outranks(source, nick) {
+                    log_db(db.add_user(auth, nick));
+                    send_reply(client, target, source, &format!("Promoting {} to rank {}.", nick, auth))
+                } else {
+                    Ok(unauthorized(&source, &message))
+                }
+            }
+        }
+    } 
+
+    else if command == "forget" {
+        if db.auth(3, source) && db.outranks(source, &content) {
+            match db.delete_user(&content) {
+                Err(e) => 
+                        Ok(log(COLOR_WARN, &format!("DB Error: {}", e))),
+                Ok(true) => 
+                        send_reply(client, target, source, &format!("Forgot {}.", content)),
+                Ok(false) => 
+                        send_reply(client, target, source, &format!("I don't know {}.", content)),
+            }
+        } else {
+            Ok(unauthorized(&source, &message))
+        }
+    }
+    
+    else if command == "hug" {
         send_action(&client, target, &format!("hugs {}.", source))
-    } else if command == "quit" {
-        client.send_quit("Shutting down, bleep bloop.".to_owned())
-    } else if command == "reload" {
+    } 
+    
+    else if command == "quit" {
+        if db.auth(3, source) {
+            client.send_quit("Shutting down, bleep bloop.".to_owned())
+        } else {
+            Ok(unauthorized(&source, &message))
+        }
+    } 
+    
+    else if command == "reload" {
         if db.auth(4, source) {
             log(COLOR_DEBUG, "Reloading properties.");
             db.reload();
             send_privmsg(client, target, "Properties reloaded.")
         } else {
-            unauthorized(&source, &message);
-            Ok(())
+            Ok(unauthorized(&source, &message))
         }
-    } else if "wikipedia".starts_with(&command) {
+    } 
+    
+    else if "wikipedia".starts_with(&command) {
         match wikipedia::search(&content) {
-            Ok(result) => send_reply(client, source, target, &result),
+            Ok(result) => send_reply(client, target, source, &result),
             Err(e) => {
                 log(COLOR_DEBUG, &format!("Wikipedia error: {}", e));
-                send_reply(client, source, target, NO_RESULTS)
+                send_reply(client, target, source, NO_RESULTS)
             }
         }
-    } else if "zyn".starts_with(&command) {
-        send_reply(client, source, target, "Marp.")
-    } else {
+    } 
+    
+    else if "zyn".starts_with(&command) {
+        send_reply(client, target, source, "Marp.")
+    } 
+    
+    else {
         Ok(())
     }
 }
 
 fn log(code: u8, s: &str) {
-    println!("\x1b[{}m{}\x1b[0m", code, s)
+    println!("\x1b[{}m{}\x1b[0m", code, s);
 }
 
 fn send_action(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
@@ -62,7 +104,7 @@ fn send_action(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcErr
 }
 
 fn unauthorized(user: &str, command: &str) {
-    log(COLOR_WARN, &format!("{} attempted to use an unauthorized command: {}!", user, command))
+    log(COLOR_WARN, &format!("{} attempted to use an unauthorized command: {}!", user, command));
 }
 
 fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
@@ -70,6 +112,19 @@ fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcEr
     client.send_privmsg(target, msg)
 }
 
-fn send_reply(client: &IrcClient, source: &str, target: &str, msg: &str) -> Result<(), IrcError> {
+fn send_reply(client: &IrcClient, target: &str, source: &str, msg: &str) -> Result<(), IrcError> {
     send_privmsg(client, target, &format!("{}: {}", source, msg))
+}
+
+fn log_db(res: Result<(), diesel::result::Error>) {
+    if let Err(e) = res {
+        log(COLOR_WARN, &format!("DB error: {}", e));
+    }
+}
+
+fn parse_auth(command: &str) -> Option<(i32, &str)> {
+    let space = command.find(' ')?;
+    let (auth_s, nick) = command.split_at(space);
+    let auth: u16 = auth_s.parse().ok()?;
+    Some((auth as i32, &nick[1..]))
 }
