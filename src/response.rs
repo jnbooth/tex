@@ -1,19 +1,17 @@
-use diesel::pg::PgConnection;
 use irc::client::prelude::*;
 use irc::error::IrcError;
-use std::collections::HashMap;
 
-use super::db;
+use super::db::Db;
 
 mod wikipedia;
 
-const COLOR_ECHO: u8 = 32;
 const COLOR_DEBUG: u8 = 34;
+const COLOR_ECHO: u8 = 32;
+const COLOR_UNAUTHORIZED: u8 = 31;
 const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
 pub fn respond(
-    conn: &PgConnection, 
-    props: &mut HashMap<String, String>, 
+    db: &mut Db, 
     client: &IrcClient, 
     source: &str, 
     target: &str, 
@@ -31,12 +29,14 @@ pub fn respond(
     } else if command == "quit" {
         client.send_quit("Shutting down, bleep bloop.".to_owned())
     } else if command == "reload" {
-        log(COLOR_DEBUG, "Reloading properties.");
-        props.clear();
-        for (k, v) in db::load_properties(conn) {
-            props.insert(k, v);
+        if db.auth(4, source) {
+            log(COLOR_DEBUG, "Reloading properties.");
+            db.load();
+            send_privmsg(client, target, "Properties reloaded.")
+        } else {
+            unauthorized(&source, &message);
+            Ok(())
         }
-        send_privmsg(client, target, "Properties reloaded.")
     } else if "wikipedia".starts_with(&command) {
         match wikipedia::search(&content) {
             Ok(result) => send_reply(client, source, target, &result),
@@ -59,6 +59,13 @@ fn log(code: u8, s: &str) {
 fn send_action(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
     log(COLOR_ECHO, &format!("> /me {}", msg));
     client.send_action(target, msg)
+}
+
+fn unauthorized(user: &str, command: &str) {
+    log(
+        COLOR_UNAUTHORIZED, 
+        &format!("{} attempted to use an unauthorized command: {}!", user, command)
+    )
 }
 
 fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {

@@ -1,5 +1,6 @@
 extern crate tex;
 
 fn main() {
-    tex::run()
+    let result = tex::run();
+    println!("{:?}", result);
 }
