@@ -3,6 +3,7 @@ use irc::error::IrcError;
 use regex::*;
 use std::borrow::ToOwned;
 use std::time::*;
+use rand::*;
 
 use super::db::Db;
 
@@ -54,7 +55,13 @@ pub fn respond(
                 }
             }
         }
-    } 
+    }
+
+    else if "choose".starts_with(&command) {
+        let opts: Vec<&str> = content.split(',').map(str::trim).collect();
+        let choice = opts[rand::thread_rng().gen_range(0, opts.len())];
+        send_reply(client, target, source, choice)
+    }
 
     else if command == "forget" {
         if !db.auth(3, source) || !db.outranks(source, &content) {
@@ -154,6 +161,8 @@ fn usage(command: &str) -> String {
     let args = |xs| format!("Usage: {} {}.", command, xs);
     if command == "auth" {
         args("level user")
+    } else if "choose".starts_with(command) {
+        args("choices, separated, by commas")
     } else if command == "forget" {
         args("user")
     } else if command == "help" {

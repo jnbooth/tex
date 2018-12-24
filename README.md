@@ -3,6 +3,12 @@ A different approach to chatbot commands.
 
 ## Commands
 
+#### [choose], [ch]
+
+__Usage:__ `choose choices, separated, by commas`
+
+Randomly selects an item from a list.
+
 #### [help]
 
 __Usage:__ `help command`
