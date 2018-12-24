@@ -1,10 +1,9 @@
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
-use dotenv::dotenv;
-use std::env;
 use std::collections::HashMap;
 use std::iter::*;
 
+use super::*;
 use super::models::*;
 use super::schema;
 use super::wikidot::Wikidot;
@@ -21,7 +20,7 @@ impl Db {
         let conn = establish_connection();
         let props = load_props(&conn);
         let users = load_users(&conn);
-        let wiki = load_wiki(&props);
+        let wiki = Wikidot::new(&from_env("WIKIDOT_USER"), &from_env("WIKIDOT_KEY"));
         Db { conn, props, users, wiki }
     }
 
@@ -35,15 +34,11 @@ impl Db {
     pub fn reload(&mut self) {
         self.props = load_props(&self.conn);
         self.users = load_users(&self.conn);
-        self.wiki = load_wiki(&self.props);
     }
 }
 
 fn establish_connection() -> PgConnection {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+    let database_url = from_env("DATABASE_URL");
     PgConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}", database_url))
 }
@@ -63,12 +58,5 @@ fn load_users(conn: &PgConnection) -> HashMap<String, User> {
             .expect("Error loading users")
             .into_iter()
             .map(|x: User| (x.nick.to_owned(), x))
-    )
-}
-
-fn load_wiki(props: &HashMap<String, String>) -> Wikidot {
-    Wikidot::new(
-        props.get("wikidotUser").unwrap(), 
-        props.get("wikidotKey").unwrap()
-    )
+    )   
 }

@@ -11,9 +11,10 @@ extern crate serde_json;
 extern crate simple_error;
 extern crate xmlrpc;
 
+use dotenv::dotenv;
 use irc::client::prelude::*;
 use irc::error::IrcError;
-use std::collections::HashMap;
+use std::env;
 use std::iter::*;
 
 mod db;
@@ -27,8 +28,9 @@ use self::db::*;
 pub type IO<T> = Result<T, Box<std::error::Error>>;
 
 pub fn run() -> Result<(), IrcError> {
+    dotenv().ok();
     let mut db = Db::new();
-    let config = to_config(&db.props);
+    let config = get_config();
     let mut reactor = IrcReactor::new()?;
     let client = reactor.prepare_client_and_connect(&config)?;
     client.identify()?;
@@ -38,12 +40,16 @@ pub fn run() -> Result<(), IrcError> {
     reactor.run()
 }
 
-fn to_config(props: &HashMap<String, String>) -> Config {
+fn from_env(var: &str) -> String {
+    env::var(var).expect(&format!("{} must be set in ./.env", var))
+}
+
+fn get_config() -> Config {
     Config {
-        server: props.get("server").map(ToOwned::to_owned),
-        nickname: props.get("nick").map(ToOwned::to_owned),
-        channels: props.get("autojoin").map(|x| x.split(",").map(ToOwned::to_owned).collect()),
-        password: props.get("password").map(ToOwned::to_owned),
+        server:   Some(from_env("IRC_SERVER")),
+        nickname: Some(from_env("IRC_NICK")),
+        password: Some(from_env("IRC_PASSWORD")),
+        channels: Some(from_env("AUTOJOIN").split(",").map(|x| format!("#{}", x)).collect()),
         ..Config::default()
     }
 }
