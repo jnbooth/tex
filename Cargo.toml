@@ -9,6 +9,7 @@ diesel = { version = "*", features = ["postgres"] }
 dotenv = "*"
 irc = "*"
 lazy_static = "*"
+multimap = "*"
 percent-encoding = "*"
 regex = "*"
 reqwest = "*"

@@ -61,6 +61,11 @@ fn handler(db: &mut Db, client: &IrcClient, message: Message) -> Result<(), IrcE
     match (m_prefix, m_target, message.command.to_owned()) {
         (Some(prefix), Some(target), Command::PRIVMSG(_, msg)) => {
             if let Some(source) = prefix.split("!").next() {
+                if let Some(reminders) = db.get_reminders(&source) {
+                    for x in reminders {
+                        response::send_privmsg(client, source, &format!("Reminder: {}", x.message))?
+                    }
+                }
                 for command in get_commands(&msg) {
                     response::respond(db, &client, &source, &target, &command)?
                 }

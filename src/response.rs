@@ -1,5 +1,8 @@
 use irc::client::prelude::*;
 use irc::error::IrcError;
+use regex::*;
+use std::borrow::ToOwned;
+use std::time::*;
 
 use super::db::Db;
 
@@ -18,28 +21,47 @@ pub fn respond(
     message: &str
 ) -> Result<(), IrcError> {
     let (command, content) = match message.find(' ') {
-        None => (message.to_lowercase(), "".to_string()),
+        None    => (message.to_lowercase(), "".to_string()),
         Some(i) => {
             let (command, content) = message.split_at(i);
             (command.to_lowercase(), content[1..].to_string())
         }
     };
+    
+    let wrong  = || send_reply(client, target, source, &usage(&command));
+    let unauth = || Ok(unauthorized(source, message));
+
+    let args: Vec<String> = content
+        .split(' ')
+        .map(ToOwned::to_owned)
+        .filter(|x| !x.is_empty())
+        .collect();
+    let len = args.len();
     if command == "auth" {
-        match parse_auth(&content) {
-            None => send_reply(client, target, source, &usage(&command)),
-            Some((auth, nick)) => {
-                if db.auth(auth + 1, source) && db.outranks(source, nick) {
-                    log_db(db.add_user(auth, nick));
-                    send_reply(client, target, source, &format!("Promoting {} to rank {}.", nick, auth))
-                } else {
-                    Ok(unauthorized(source, message))
+        if len != 2 {
+            wrong()
+        } else { 
+            match args[0].parse() {
+                Err(_) => wrong(),
+                Ok(auth) => {
+                    let nick = args[1].to_owned();
+                    if !db.auth(auth + 1, source) || db.outranks(source, &nick) {
+                        unauth()
+                    } else {
+                        log_db(db.add_user(auth, &nick));
+                        send_reply(client, target, source, &format!("Promoting {} to rank {}.", nick, auth))
+                    }
                 }
             }
         }
     } 
 
     else if command == "forget" {
-        if db.auth(3, source) && db.outranks(source, &content) {
+        if !db.auth(3, source) || !db.outranks(source, &content) {
+            unauth()
+        } else if len != 1 {
+            wrong()
+        } else { 
             match db.delete_user(&content) {
                 Err(e) => 
                         Ok(log(COLOR_WARN, &format!("DB Error: {}", e))),
@@ -48,43 +70,72 @@ pub fn respond(
                 Ok(false) => 
                         send_reply(client, target, source, &format!("I don't know {}.", content)),
             }
-        } else {
-            Ok(unauthorized(source, message))
         }
     }
 
     else if command == "help" {
-        send_reply(client, target, source, &usage(&content))
+        if len != 1 {
+            wrong()
+        } else {
+            send_reply(client, target, source, &usage(&content))
+        }
     }
     
     else if command == "hug" {
-        send_action(client, target, &format!("hugs {}.", source))
+        if len != 0 {
+            wrong()
+        } else {
+            send_action(client, target, &format!("hugs {}.", source))
+        }
     } 
     
     else if command == "quit" {
-        if db.auth(3, source) {
-            client.send_quit("Shutting down, bleep bloop.".to_owned())
+        if !db.auth(3, source) {
+            unauth()
+        } else if len != 0 {
+            wrong()
         } else {
-            Ok(unauthorized(source, message))
+            client.send_quit("Shutting down, bleep bloop.".to_owned())
         }
     } 
     
     else if command == "reload" {
-        if db.auth(4, source) {
+        if !db.auth(4, source) {
+            unauth()
+        } else if len != 0 {
+            wrong()
+        } else {
             log(COLOR_DEBUG, "Reloading properties.");
             db.reload();
             send_privmsg(client, target, "Properties reloaded.")
-        } else {
-            Ok(unauthorized(source, message))
         }
     } 
+
+    else if "remindme".starts_with(&command) {
+        if len < 2 {
+            wrong()
+        } else {
+            match parse_offset(&args[0]) {
+                None         => wrong(),
+                Some(offset) => {
+                    let when = SystemTime::now() + offset;
+                    log_db(db.add_reminder(source, when, &args[1..].join(" ")));
+                    send_reply(client, target, source, "Reminder added.")
+                }
+            }
+        }
+    }
     
     else if "wikipedia".starts_with(&command) {
-        match wikipedia::search(&content) {
-            Ok(result) => send_reply(client, target, source, &result),
-            Err(e) => {
-                log(COLOR_DEBUG, &format!("Wikipedia error: {}", e));
-                send_reply(client, target, source, NO_RESULTS)
+        if len == 0 {
+            wrong()
+        } else {
+            match wikipedia::search(&content) {
+                Ok(result) => send_reply(client, target, source, &result),
+                Err(e) => {
+                    log(COLOR_DEBUG, &format!("Wikipedia error: {}", e));
+                    send_reply(client, target, source, NO_RESULTS)
+                }
             }
         }
     } 
@@ -99,8 +150,8 @@ pub fn respond(
 }
 
 fn usage(command: &str) -> String {
-    let noargs = format!("Usage: [{}]", command);
-    let args = |xs| format!("Usage: [{} {}]", command, xs);
+    let noargs = format!("Usage: {}.", command);
+    let args = |xs| format!("Usage: {} {}.", command, xs);
     if command == "auth" {
         args("level user")
     } else if command == "forget" {
@@ -113,6 +164,8 @@ fn usage(command: &str) -> String {
         noargs
     } else if command == "reload" {
         noargs
+    } else if "remindme".starts_with(&command) {
+        format!("Usage: {} [<days>d][<hours>h][<minutes>m] message. Example: [{} 4h30m Fix my voice filter.]", command, command)
     } else if "wikipedia".starts_with(&command) {
         args("article")
     } else if "zyn".starts_with(&command) {
@@ -135,7 +188,7 @@ fn unauthorized(user: &str, command: &str) {
     log(COLOR_WARN, &format!("{} attempted to use an unauthorized command: {}!", user, command));
 }
 
-fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
+pub fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
     log(COLOR_ECHO, &format!("> {}", msg));
     client.send_privmsg(target, msg)
 }
@@ -150,9 +203,29 @@ fn log_db(res: Result<(), diesel::result::Error>) {
     }
 }
 
-fn parse_auth(command: &str) -> Option<(i32, &str)> {
-    let space = command.find(' ')?;
-    let (auth_s, nick) = command.split_at(space);
-    let auth: u16 = auth_s.parse().ok()?;
-    Some((auth as i32, &nick[1..]))
+fn yield_offset(d: u32, h: u32, m: u32) -> Option<Duration> {
+    println!("{}d{}h{}m", d, h, m);
+    Some(Duration::from_secs(60 * (m + 60 * (h + 24 * d)) as u64))
+}
+
+fn next<'r, 't>(groups: &mut Matches<'r, 't>) -> Option<u32> {
+    groups.next()?.as_str().parse().ok()
+}
+
+fn parse_offset(s: &str) -> Option<Duration> {
+    lazy_static! {
+        static ref RE: Regex = Regex::new("\\d+").unwrap();
+    }
+    let format: &str = &RE.replace_all(s, "*").into_owned();
+    let mut groups = RE.find_iter(s);
+    match format {
+        "*d*h*m" => yield_offset(next(&mut groups)?, next(&mut groups)?, next(&mut groups)?),
+        "*d*h"   => yield_offset(next(&mut groups)?, next(&mut groups)?, 0),
+        "*d*m"   => yield_offset(next(&mut groups)?, 0,                  next(&mut groups)?),
+        "*d"     => yield_offset(next(&mut groups)?, 0,                  0),
+        "*h*m"   => yield_offset(0,                  next(&mut groups)?, next(&mut groups)?),
+        "*h"     => yield_offset(0,                  next(&mut groups)?, 0),
+        "*m"     => yield_offset(0,                  0,                  next(&mut groups)?),
+        _        => None
+    }
 }
