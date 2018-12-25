@@ -66,6 +66,18 @@ __Usage:__ `auth level user`
 
 Promotes or demotes a user to a specified authorization level.
 
+#### [disable]
+
+__Usage:__ `enable command`
+
+Disables usage of a command in the same channel. The bot does not respond to disabled commands.
+
+#### [enable]
+
+__Usage:__ `enable command`
+
+Enables usage of a command in the same channel.
+
 #### [forget]
 
 __Usage:__ `forget user`
