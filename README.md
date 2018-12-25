@@ -66,6 +66,12 @@ __Usage:__ `auth level user`
 
 Promotes or demotes a user to a specified authorization level.
 
+#### [define], [def], [d]
+
+__Usage:__ `define word`
+
+Looks up the dictionary definition of a word.
+
 #### [disable]
 
 __Usage:__ `enable command`

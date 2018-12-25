@@ -6,6 +6,7 @@ extern crate percent_encoding;
 extern crate lazy_static;
 extern crate regex;
 extern crate reqwest;
+extern crate select;
 extern crate serde;
 extern crate serde_json;
 extern crate simple_error;
@@ -17,6 +18,7 @@ use irc::error::IrcError;
 use std::env;
 use std::iter::*;
 
+mod color;
 mod db;
 mod models;
 mod response;
@@ -24,6 +26,7 @@ mod schema;
 mod wikidot;
 
 use self::db::*;
+use self::color::log_part;
 
 pub type IO<T> = Result<T, Box<std::error::Error>>;
 
@@ -55,23 +58,28 @@ fn get_config() -> Config {
 }
 
 fn handler(db: &mut Db, client: &IrcClient, message: Message) -> Result<(), IrcError> {
-    print!("{}", message);
     let m_prefix = message.prefix.to_owned();
     let m_target = message.response_target().to_owned();
     match (m_prefix, m_target, message.command.to_owned()) {
         (Some(prefix), Some(target), Command::PRIVMSG(_, msg)) => {
-            if let Some(source) = prefix.split("!").next() {
-                if let Some(reminders) = db.get_reminders(&source) {
-                    for x in reminders {
-                        response::send_privmsg(client, source, &format!("Reminder: {}", x.message))?
+            let commands = get_commands(&msg);
+            if commands.is_empty() {
+                print!("{}", message);
+            } else {
+                log_part(color::ASK, &message.to_string());
+                if let Some(source) = prefix.split("!").next() {
+                    if let Some(reminders) = db.get_reminders(&source) {
+                        for x in reminders {
+                            response::send_privmsg(client, source, &format!("Reminder: {}", x.message))?
+                        }
                     }
-                }
-                for command in get_commands(&msg) {
-                    response::respond(db, &client, &source, &target, &command)?
+                    for command in commands {
+                        response::respond(db, &client, &source, &target, &command)?
+                    }
                 }
             }
         },
-        _ => ()
+        _ => print!("{}", message)
     };
     Ok(())
 }

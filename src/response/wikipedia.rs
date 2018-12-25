@@ -15,7 +15,7 @@ fn clean_content(s: &str) -> String {
     lazy_static! {
         static ref RE: Regex = Regex::new("\\s*\\([^()]+\\)").unwrap();
     }
-    let mut content = RE.replace_all(s, "").replace("  ", " ");
+    let mut content = RE.replace_all(&s.replace("(listen)", ""), "").replace("  ", " ");
     if content.len() > CHARACTER_LIMIT {
         content = content[..CHARACTER_LIMIT-4].to_string();
         if let Some(i) = content.rfind(' ') {
@@ -49,9 +49,9 @@ fn get_entry(page: u64, json: &Value) -> Option<String> {
         .get(&page.to_string())?
         .as_object()?;
     let title = result.get("title")?.as_str()?;
-    let link = format!("(en.wikipedia.org/wiki/{})", encode(title));
+    let link = format!("en.wikipedia.org/wiki/{}", encode(title));
     let extract = result.get("extract")?.as_str()?;
-    Some(format!("{} {}", link, clean_content(&extract.replace("\n", " "))))
+    Some(format!("\x02{}\x02 ({}) {}", title, link, clean_content(&extract.replace("\n", " "))))
 }
 
 pub fn search(query: &str) -> IO<String> {

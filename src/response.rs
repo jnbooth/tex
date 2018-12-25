@@ -1,20 +1,20 @@
 use irc::client::prelude::*;
 use irc::error::IrcError;
-use regex::*;
 use std::borrow::ToOwned;
 use std::time::*;
 use rand::*;
 
 use super::db::Db;
+use super::color;
+use super::color::log;
 
+mod dictionary;
+mod reminder;
 mod wikipedia;
 
-const COLOR_DEBUG: u8 = 34;
-const COLOR_ECHO: u8 = 32;
-const COLOR_WARN: u8 = 33;
 const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
-const ABBREVIATE: [&str; 4] = ["choose", "remindme", "wikipedia", "zyn"];
+const ABBREVIATE: [&str; 5] = ["choose", "define", "remindme", "wikipedia", "zyn"];
 
 fn abbreviate(command: &str) -> &str {
     for abbr in ABBREVIATE.into_iter() {
@@ -81,9 +81,20 @@ pub fn respond(
 
     "choose" => {
         let opts: Vec<&str> = content.split(',').map(str::trim).collect();
-        let choice = opts[rand::thread_rng().gen_range(0, opts.len())];
-        reply(choice)
-    }, 
+        reply(
+            opts[ rand::thread_rng().gen_range(0, opts.len()) ]
+        )
+    },
+
+    "define" => {
+        if len == 0 {
+            wrong()
+        } else if let Ok(result) = dictionary::search(&content) {
+            reply(&result)
+        } else {
+            reply(NO_RESULTS)
+        }
+    },
     
     "disable" => {
         if !db.auth(2, source) {
@@ -155,7 +166,7 @@ pub fn respond(
         } else if len != 0 {
             wrong()
         } else {
-            log(COLOR_DEBUG, "Reloading properties.");
+            log(color::DEBUG, "Reloading properties.");
             db.reload();
             reply("Properties reloaded.")
         }
@@ -164,7 +175,7 @@ pub fn respond(
     "remindme" => {
         if len < 2 {
             wrong()
-        } else if let Some(offset) = parse_offset(&args[0]) {
+        } else if let Some(offset) = reminder::parse_offset(&args[0]) {
             let when = SystemTime::now() + offset;
             log_db(db.add_reminder(source, when, &args[1..].join(" ")));
             reply("Reminder added.")
@@ -198,6 +209,12 @@ fn usage(command: &str) -> String {
         args("level user")
     } else if "choose".starts_with(command) {
         args("choices, separated, by commas")
+    } else if "define".starts_with(command) {
+        args("word")
+    } else if command == "disable" {
+        args("command")
+    } else if command == "enable" {
+        args("command")
     } else if command == "forget" {
         args("user")
     } else if command == "help" {
@@ -219,21 +236,17 @@ fn usage(command: &str) -> String {
     }
 }
 
-fn log(code: u8, s: &str) {
-    println!("\x1b[{}m{}\x1b[0m", code, s);
-}
-
 fn send_action(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
-    log(COLOR_ECHO, &format!("> /me {}", msg));
+    log(color::ECHO, &format!("> /me {}", msg));
     client.send_action(target, msg)
 }
 
 fn warn(msg: &str) -> Result<(), IrcError> {
-    Ok(log(COLOR_WARN, msg))
+    Ok(log(color::WARN, msg))
 }
 
 pub fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
-    log(COLOR_ECHO, &format!("> {}", msg));
+    log(color::ECHO, &format!("> {}", msg));
     client.send_privmsg(target, msg)
 }
 
@@ -243,33 +256,6 @@ fn send_reply(client: &IrcClient, target: &str, source: &str, msg: &str) -> Resu
 
 fn log_db(res: Result<(), diesel::result::Error>) {
     if let Err(e) = res {
-        log(COLOR_WARN, &format!("DB error: {}", e));
-    }
-}
-
-fn yield_offset(d: u32, h: u32, m: u32) -> Option<Duration> {
-    println!("{}d{}h{}m", d, h, m);
-    Some(Duration::from_secs(60 * (m + 60 * (h + 24 * d)) as u64))
-}
-
-fn next<'r, 't>(groups: &mut Matches<'r, 't>) -> Option<u32> {
-    groups.next()?.as_str().parse().ok()
-}
-
-fn parse_offset(s: &str) -> Option<Duration> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new("\\d+").unwrap();
-    }
-    let format: &str = &RE.replace_all(s, "*").into_owned();
-    let mut groups = RE.find_iter(s);
-    match format {
-        "*d*h*m" => yield_offset(next(&mut groups)?, next(&mut groups)?, next(&mut groups)?),
-        "*d*h"   => yield_offset(next(&mut groups)?, next(&mut groups)?, 0),
-        "*d*m"   => yield_offset(next(&mut groups)?, 0,                  next(&mut groups)?),
-        "*d"     => yield_offset(next(&mut groups)?, 0,                  0),
-        "*h*m"   => yield_offset(0,                  next(&mut groups)?, next(&mut groups)?),
-        "*h"     => yield_offset(0,                  next(&mut groups)?, 0),
-        "*m"     => yield_offset(0,                  0,                  next(&mut groups)?),
-        _        => None
+        log(color::WARN, &format!("DB error: {}", e));
     }
 }
