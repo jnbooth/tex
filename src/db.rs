@@ -1,3 +1,4 @@
+use core::hash::Hash;
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use multimap::MultiMap;
@@ -23,11 +24,27 @@ fn drain_filter<F, T>(vec: &mut Vec<T>, filter: F) -> Vec<T> where F: Fn(&T) -> 
     drained
 }
 
+fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: K, v: V) -> bool {
+    if let Some(vec) = map.get_vec_mut(&k) {
+        let mut i = 0;
+        while i != vec.len() {
+            if vec[i] == v {
+                vec.remove(i);
+                return true
+            } else {
+                i += 1;
+            }
+        }
+    }
+    false
+}
+
 pub struct Db {
     nick:       String,
     conn:       PgConnection,
     properties: HashMap<String, String>,
     reminders:  MultiMap<String, Reminder>,
+    silences:   MultiMap<String, String>,
     users:      HashMap<String, User>,
     pub wiki:   Option<Wikidot>
 }
@@ -39,6 +56,7 @@ impl Db {
             nick:       from_env("IRC_NICK").to_lowercase(),
             properties: load_properties(&conn), 
             reminders:  load_reminders(&conn),
+            silences:   load_silences(&conn),
             users:      load_users(&conn), 
             wiki:       Wikidot::new(), 
             conn 
@@ -48,6 +66,7 @@ impl Db {
     pub fn reload(&mut self) {
         self.properties = load_properties(&self.conn);
         self.reminders  = load_reminders(&self.conn);
+        self.silences   = load_silences(&self.conn);
         self.users      = load_users(&self.conn);
     }
 
@@ -107,14 +126,35 @@ impl Db {
     }
     pub fn get_reminders(&mut self, nick_up: &str) -> Option<Vec<Reminder>> {
         let when = SystemTime::now();
-        let mut reminders = self.reminders.remove(&nick_up.to_lowercase())?;
+        let mut reminders = self.reminders.get_vec_mut(&nick_up.to_lowercase())?;
         let expired = drain_filter(&mut reminders, |x| x.when < when);
-        for reminder in reminders {
-            self.reminders.insert(reminder.nick.to_owned(), reminder);
-        }
         diesel::delete(schema::reminder::table.filter(schema::reminder::when.lt(when)))
             .execute(&self.conn).ok();
         Some(expired)
+    }
+
+    pub fn silenced(&self, channel: &str, command: &str) -> bool {
+        match self.silences.get_vec(channel) {
+            None => false,
+            Some(silence) => silence.contains(&command.to_owned())
+        }
+    }
+
+    pub fn set_enabled(&mut self, channel: &str, command: &str, enabled: bool) 
+    -> Result<(), diesel::result::Error> {
+        if enabled {
+            multi_remove(&mut self.silences, channel.to_owned(), command.to_owned());
+            diesel::delete(schema::silence::table
+                .filter(schema::silence::channel.eq(channel))
+                .filter(schema::silence::command.eq(command))
+            ).execute(&self.conn)?;
+        } else {
+            self.silences.insert(channel.to_owned(), command.to_owned());
+            diesel::insert_into(schema::silence::table)
+                .values(DbSilence { channel: channel.to_owned(), command: command.to_owned() })
+                .execute(&self.conn)?;
+        }
+        Ok(())
     }
 }
 
@@ -139,6 +179,15 @@ fn load_reminders(conn: &PgConnection) -> MultiMap<String, Reminder> {
             .expect("Error loading reminders")
             .into_iter()
             .map(|x: Reminder| (x.nick.to_owned(), x))
+    )
+}
+
+fn load_silences(conn: &PgConnection) -> MultiMap<String, String> {
+    MultiMap::from_iter(
+        schema::silence::table.load(conn)
+            .expect("Error loading reminders")
+            .into_iter()
+            .map(|x: Silence| (x.channel, x.command))
     )
 }
 

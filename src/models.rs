@@ -23,6 +23,20 @@ pub struct Reminder {
     pub message: String
 }
 
+use super::schema::silence;
+#[derive(Insertable)]
+#[table_name = "silence"]
+pub struct DbSilence {
+    pub command: String,
+    pub channel: String
+}
+#[derive(Queryable)]
+pub struct Silence {
+    _id: i32,
+    pub command: String,
+    pub channel: String
+}
+
 use super::schema::user;
 #[derive(Insertable, Queryable)]
 #[table_name = "user"]

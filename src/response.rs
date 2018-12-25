@@ -14,6 +14,17 @@ const COLOR_ECHO: u8 = 32;
 const COLOR_WARN: u8 = 33;
 const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
+const ABBREVIATE: [&str; 4] = ["choose", "remindme", "wikipedia", "zyn"];
+
+fn abbreviate(command: &str) -> &str {
+    for abbr in ABBREVIATE.into_iter() {
+        if abbr.starts_with(command) {
+            return abbr
+        }
+    }
+    command
+}
+
 pub fn respond(
     db: &mut Db, 
     client: &IrcClient, 
@@ -21,13 +32,19 @@ pub fn respond(
     target: &str, 
     message: &str
 ) -> Result<(), IrcError> {
-    let (command, content) = match message.find(' ') {
+    let (command_base, content) = match message.find(' ') {
         None    => (message.to_lowercase(), "".to_string()),
         Some(i) => {
             let (command, content) = message.split_at(i);
             (command.to_lowercase(), content[1..].to_string())
         }
     };
+
+    let command = abbreviate(&command_base);
+
+    if db.silenced(target, command) {
+        return warn(&format!("{} attempted to use a silenced command: {}!", target, command))
+    }
 
     let args: Vec<String> = content
         .split(' ')
@@ -36,10 +53,15 @@ pub fn respond(
         .collect();
     let len = args.len();
     
-    let wrong  = || send_reply(client, target, source, &usage(&command));
-    let unauth = || Ok(unauthorized(source, message));
+    let reply  = |msg: &str| send_reply(client, target, source, msg);
+    let wrong  = || reply(&usage(&command_base));
+    let unauth = || warn(
+        &format!("{} attempted to use an unauthorized command: {}!", source, command)
+    );
 
-    if command == "auth" {
+    match command {
+
+    "auth" => {
         if !db.auth(3, source) {
             unauth()
         } else if len != 2 {
@@ -50,53 +72,74 @@ pub fn respond(
                 unauth()
             } else {
                 log_db(db.add_user(auth, &nick));
-                send_reply(client, target, source, &format!("Promoting {} to rank {}.", nick, auth))
+                reply(&format!("Promoting {} to rank {}.", nick, auth))
             }
         } else {
             wrong()
         }
-    }
+    },
 
-    else if "choose".starts_with(&command) {
+    "choose" => {
         let opts: Vec<&str> = content.split(',').map(str::trim).collect();
         let choice = opts[rand::thread_rng().gen_range(0, opts.len())];
-        send_reply(client, target, source, choice)
-    }
+        reply(choice)
+    }, 
+    
+    "disable" => {
+        if !db.auth(2, source) {
+            unauth()
+        } else if len != 1 {
+            wrong()
+        } else {
+            let disable = abbreviate(&content);
+            log_db(db.set_enabled(target, &disable, false));
+            reply(&format!("[{}] disabled.", disable))
+        }
+    },
 
-    else if command == "forget" {
+    "enable" => {
+        if !db.auth(2, source) {
+            unauth()
+        } else if len != 1 {
+            wrong()
+        } else {
+            let enable = abbreviate(&content);
+            log_db(db.set_enabled(target, &enable, true));
+            reply(&format!("[{}] enabled.", enable))
+        }
+    },
+    
+    "forget" => {
         if !db.auth(3, source) || !db.outranks(source, &content) {
             unauth()
         } else if len != 1 {
             wrong()
         } else { 
             match db.delete_user(&content) {
-                Err(e) => 
-                        Ok(log(COLOR_WARN, &format!("DB Error: {}", e))),
-                Ok(true) => 
-                        send_reply(client, target, source, &format!("Forgot {}.", content)),
-                Ok(false) => 
-                        send_reply(client, target, source, &format!("I don't know {}.", content)),
+                Err(e)    => warn(&format!("DB Error: {}", e)),
+                Ok(true)  => reply(&format!("Forgot {}.", content)),
+                Ok(false) => reply(&format!("I don't know {}.", content)),
             }
         }
-    }
+    },
 
-    else if command == "help" {
+    "help" => {
         if len != 1 {
             wrong()
         } else {
-            send_reply(client, target, source, &usage(&content))
+            reply(&usage(&content))
         }
-    }
-    
-    else if command == "hug" {
+    },
+
+    "hug" => {
         if len != 0 {
             wrong()
         } else {
             send_action(client, target, &format!("hugs {}.", source))
         }
-    } 
-    
-    else if command == "quit" {
+    },
+
+    "quit" => {
         if !db.auth(3, source) {
             unauth()
         } else if len != 0 {
@@ -104,9 +147,9 @@ pub fn respond(
         } else {
             client.send_quit("Shutting down, bleep bloop.".to_owned())
         }
-    } 
-    
-    else if command == "reload" {
+    }, 
+
+    "reload" => {
         if !db.auth(4, source) {
             unauth()
         } else if len != 0 {
@@ -114,38 +157,37 @@ pub fn respond(
         } else {
             log(COLOR_DEBUG, "Reloading properties.");
             db.reload();
-            send_privmsg(client, target, "Properties reloaded.")
+            reply("Properties reloaded.")
         }
-    } 
+    },
 
-    else if "remindme".starts_with(&command) {
+    "remindme" => {
         if len < 2 {
             wrong()
         } else if let Some(offset) = parse_offset(&args[0]) {
             let when = SystemTime::now() + offset;
             log_db(db.add_reminder(source, when, &args[1..].join(" ")));
-            send_reply(client, target, source, "Reminder added.")
+            reply("Reminder added.")
         } else {
             wrong()
         }
-    }
-    
-    else if "wikipedia".starts_with(&command) {
+    },
+
+    "wikipedia" => {
         if len == 0 {
             wrong()
         } else if let Ok(result) = wikipedia::search(&content) {
-            send_reply(client, target, source, &result)
+            reply(&result)
         } else {
-            send_reply(client, target, source, NO_RESULTS)
+            reply(NO_RESULTS)
         }
-    } 
+    },
     
-    else if "zyn".starts_with(&command) {
-        send_reply(client, target, source, "Marp.")
-    } 
-    
-    else {
-        Ok(())
+    "zyn" => {
+        reply("Marp.")
+    },
+
+    _ => Ok(())
     }
 }
 
@@ -186,8 +228,8 @@ fn send_action(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcErr
     client.send_action(target, msg)
 }
 
-fn unauthorized(user: &str, command: &str) {
-    log(COLOR_WARN, &format!("{} attempted to use an unauthorized command: {}!", user, command));
+fn warn(msg: &str) -> Result<(), IrcError> {
+    Ok(log(COLOR_WARN, msg))
 }
 
 pub fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
