@@ -5,9 +5,9 @@ A different approach to chatbot commands.
 
 ### Setup
 
-Install [Rust](#https://www.rust-lang.org/tools/install) if you don't already have it.
+Install [Rust](https://www.rust-lang.org/tools/install) if you don't already have it.
 
-In order to run, the program needs access to a PostgreSQL server, which can be local or remote. PostgreSQL can be downloaded [here](#https://www.postgresql.org/download/).
+In order to run, the program needs access to a PostgreSQL server, which can be local or remote. PostgreSQL can be downloaded [here](https://www.postgresql.org/download/).
 
 Copy `.env.example` to `.env` and fill out the fields, including the link to your PostgreSQL server. The server must be running for the next steps:
 
