@@ -1,6 +1,26 @@
 # [Tex]
 A different approach to chatbot commands.
 
+## Development
+
+### Setup
+
+Install [Rust](#https://www.rust-lang.org/tools/install) if you don't already have it, then run the following commands:
+
+~~~
+cargo install diesel_cli
+diesel migration run
+cp .env.example .env
+~~~
+
+Finally, fill out the fields in `.env`.
+
+### Building
+
+To build and run the project, use `cargo run --release`. To build without running it, use `cargo build --release`. Note that the first time building the project will take much longer in order to download and compile dependencies. 
+
+In order to run, the program needs access to a live PostgreSQL server, which can be local or remote. PostgreSQL can be downloaded [here](#https://www.postgresql.org/download/). The server connection is configured in the `.env` file.
+
 ## Commands
 
 #### [choose], [ch]

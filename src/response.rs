@@ -28,9 +28,6 @@ pub fn respond(
             (command.to_lowercase(), content[1..].to_string())
         }
     };
-    
-    let wrong  = || send_reply(client, target, source, &usage(&command));
-    let unauth = || Ok(unauthorized(source, message));
 
     let args: Vec<String> = content
         .split(' ')
@@ -38,22 +35,25 @@ pub fn respond(
         .filter(|x| !x.is_empty())
         .collect();
     let len = args.len();
+    
+    let wrong  = || send_reply(client, target, source, &usage(&command));
+    let unauth = || Ok(unauthorized(source, message));
+
     if command == "auth" {
-        if len != 2 {
+        if !db.auth(3, source) {
+            unauth()
+        } else if len != 2 {
             wrong()
-        } else { 
-            match args[0].parse() {
-                Err(_) => wrong(),
-                Ok(auth) => {
-                    let nick = args[1].to_owned();
-                    if !db.auth(auth + 1, source) || db.outranks(source, &nick) {
-                        unauth()
-                    } else {
-                        log_db(db.add_user(auth, &nick));
-                        send_reply(client, target, source, &format!("Promoting {} to rank {}.", nick, auth))
-                    }
-                }
+        } else if let Ok(auth) = args[0].parse() {
+            let nick = args[1].to_owned();
+            if !db.outranks(source, &nick) {
+                unauth()
+            } else {
+                log_db(db.add_user(auth, &nick));
+                send_reply(client, target, source, &format!("Promoting {} to rank {}.", nick, auth))
             }
+        } else {
+            wrong()
         }
     }
 
@@ -121,29 +121,22 @@ pub fn respond(
     else if "remindme".starts_with(&command) {
         if len < 2 {
             wrong()
+        } else if let Some(offset) = parse_offset(&args[0]) {
+            let when = SystemTime::now() + offset;
+            log_db(db.add_reminder(source, when, &args[1..].join(" ")));
+            send_reply(client, target, source, "Reminder added.")
         } else {
-            match parse_offset(&args[0]) {
-                None         => wrong(),
-                Some(offset) => {
-                    let when = SystemTime::now() + offset;
-                    log_db(db.add_reminder(source, when, &args[1..].join(" ")));
-                    send_reply(client, target, source, "Reminder added.")
-                }
-            }
+            wrong()
         }
     }
     
     else if "wikipedia".starts_with(&command) {
         if len == 0 {
             wrong()
+        } else if let Ok(result) = wikipedia::search(&content) {
+            send_reply(client, target, source, &result)
         } else {
-            match wikipedia::search(&content) {
-                Ok(result) => send_reply(client, target, source, &result),
-                Err(e) => {
-                    log(COLOR_DEBUG, &format!("Wikipedia error: {}", e));
-                    send_reply(client, target, source, NO_RESULTS)
-                }
-            }
+            send_reply(client, target, source, NO_RESULTS)
         }
     } 
     
