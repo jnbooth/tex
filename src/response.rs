@@ -1,16 +1,16 @@
-use irc::client::prelude::*;
 use irc::error::IrcError;
 use std::borrow::ToOwned;
-use std::time::*;
-use rand::*;
+use std::time::SystemTime;
+use rand::Rng;
 
-use super::db::Db;
+pub use super::db::Db;
 use super::color;
 use super::color::log;
 
 pub mod choice;
 mod dictionary;
 mod reminder;
+pub mod responder;
 mod wikipedia;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
@@ -26,9 +26,9 @@ fn abbreviate(command: &str) -> &str {
     command
 }
 
-pub fn respond(
+pub fn respond<T: responder::Responder>(
     db: &mut Db, 
-    client: &IrcClient, 
+    client: &T, 
     source: &str, 
     target: &str, 
     message: &str
@@ -54,7 +54,7 @@ pub fn respond(
         .collect();
     let len = args.len();
     
-    let reply  = |msg: &str| send_reply(client, target, source, msg);
+    let reply  = |msg: &str| client.reply(target, source, msg);
     let wrong  = || reply(&usage(&command_base));
     let unauth = || warn(
         &format!("{} attempted to use an unauthorized command: {}!", source, command)
@@ -104,7 +104,7 @@ pub fn respond(
             wrong()
         } else {
             let disable = abbreviate(&content);
-            log_db(db.set_enabled(target, &disable, false));
+            log_db(db.set_enabled(target, disable, false));
             reply(&format!("[{}] disabled.", disable))
         }
     },
@@ -116,7 +116,7 @@ pub fn respond(
             wrong()
         } else {
             let enable = abbreviate(&content);
-            log_db(db.set_enabled(target, &enable, true));
+            log_db(db.set_enabled(target, enable, true));
             reply(&format!("[{}] enabled.", enable))
         }
     },
@@ -147,7 +147,7 @@ pub fn respond(
         if len != 0 {
             wrong()
         } else {
-            send_action(client, target, &format!("hugs {}.", source))
+            client.action(target, &format!("hugs {}.", source))
         }
     },
 
@@ -157,7 +157,7 @@ pub fn respond(
         } else if len != 0 {
             wrong()
         } else {
-            client.send_quit("Shutting down, bleep bloop.".to_owned())
+            client.quit("Shutting down, bleep bloop.")
         }
     }, 
 
@@ -250,22 +250,8 @@ fn usage(command: &str) -> String {
     }
 }
 
-fn send_action(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
-    log(color::ECHO, &format!("> /me {}", msg));
-    client.send_action(target, msg)
-}
-
 fn warn(msg: &str) -> Result<(), IrcError> {
     Ok(log(color::WARN, msg))
-}
-
-pub fn send_privmsg(client: &IrcClient, target: &str, msg: &str) -> Result<(), IrcError> {
-    log(color::ECHO, &format!("> {}", msg));
-    client.send_privmsg(target, msg)
-}
-
-fn send_reply(client: &IrcClient, target: &str, source: &str, msg: &str) -> Result<(), IrcError> {
-    send_privmsg(client, target, &format!("{}: {}", source, msg))
 }
 
 fn log_db(res: Result<(), diesel::result::Error>) {

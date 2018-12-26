@@ -1,4 +1,4 @@
-use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
+use percent_encoding::utf8_percent_encode;
 use regex::Regex;
 use serde_json::{Map, Value};
 use simple_error::SimpleError;
@@ -10,7 +10,7 @@ use super::choice;
 const CHARACTER_LIMIT: usize = 300;
 
 fn encode(s: &str) -> String {
-    utf8_percent_encode(&s.replace(" ", "_"), DEFAULT_ENCODE_SET).to_string()
+    utf8_percent_encode(&s.replace(" ", "_"), percent_encoding::DEFAULT_ENCODE_SET).to_string()
 }
 
 fn clean_content(s: &str) -> String {

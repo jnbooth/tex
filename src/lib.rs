@@ -15,7 +15,6 @@ extern crate xmlrpc;
 use dotenv::dotenv;
 use irc::client::prelude::*;
 use irc::error::IrcError;
-use std::env;
 use std::iter::*;
 
 mod color;
@@ -25,8 +24,9 @@ mod response;
 mod schema;
 mod wikidot;
 
-use self::db::*;
+use self::db::Db;
 use self::color::log_part;
+use self::response::responder::Responder;
 
 pub type IO<T> = Result<T, Box<std::error::Error>>;
 
@@ -44,7 +44,7 @@ pub fn run() -> Result<(), IrcError> {
 }
 
 fn from_env(var: &str) -> String {
-    env::var(var).expect(&format!("{} must be set in ./.env", var))
+    std::env::var(var).expect(&format!("{} must be set in ./.env", var))
 }
 
 fn get_config() -> Config {
@@ -57,7 +57,7 @@ fn get_config() -> Config {
     }
 }
 
-fn handler(db: &mut Db, client: &IrcClient, message: Message) -> Result<(), IrcError> {
+fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<(), IrcError> {
     let m_prefix = message.prefix.to_owned();
     let m_target = message.response_target().to_owned();
     match (m_prefix, m_target, message.command.to_owned()) {
@@ -68,13 +68,13 @@ fn handler(db: &mut Db, client: &IrcClient, message: Message) -> Result<(), IrcE
             } else {
                 log_part(color::ASK, &message.to_string());
                 if let Some(source) = prefix.split("!").next() {
-                    if let Some(reminders) = db.get_reminders(&source) {
+                    if let Some(reminders) = db.get_reminders(source) {
                         for x in reminders {
-                            response::send_privmsg(client, source, &format!("Reminder: {}", x.message))?
+                            client.privmsg(source, &format!("Reminder: {}", x.message))?
                         }
                     }
                     for command in commands {
-                        response::respond(db, &client, &source, &target, &command)?
+                        response::respond(db, client, source, target, command)?
                     }
                 }
             }

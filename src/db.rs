@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::iter::*;
 use std::time::SystemTime;
 
-use super::*;
+use super::from_env;
 use super::models::*;
 use super::schema;
 use super::response::choice::Choices;
