@@ -32,6 +32,12 @@ __Usage:__ `choose choices, separated, by commas`
 
 Randomly selects an item from a list.
 
+#### [define], [def], [d]
+
+__Usage:__ `define word`
+
+Looks up the dictionary definition of a word.
+
 #### [help]
 
 __Usage:__ `help command`
@@ -50,6 +56,12 @@ __Usage:__ `remindme [<days>d][<hours>h][<minutes>m]`
 
 Adds a reminder that will activate after a duration. When the reminder activates, the bot sends it to the user privately as soon as it sees a message from the user. Example: `[remindme 4h30m Fix my voice filter.]`
 
+#### [select], [sel], [s]
+
+__Usage:__ `select number`
+
+Selects one of several options given by the bot, such as when it retrieves a Wikipedia disambiguation page.
+
 #### [wikipedia], [wiki], [w]
 
 __Usage:__ `wiki article`
@@ -65,12 +77,6 @@ These commands can only be used by users who have been granted authority by the 
 __Usage:__ `auth level user`
 
 Promotes or demotes a user to a specified authorization level.
-
-#### [define], [def], [d]
-
-__Usage:__ `define word`
-
-Looks up the dictionary definition of a word.
 
 #### [disable]
 

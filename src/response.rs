@@ -8,13 +8,14 @@ use super::db::Db;
 use super::color;
 use super::color::log;
 
+pub mod choice;
 mod dictionary;
 mod reminder;
 mod wikipedia;
 
-const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
+pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
-const ABBREVIATE: [&str; 5] = ["choose", "define", "remindme", "wikipedia", "zyn"];
+const ABBREVIATE: [&str; 6] = ["choose", "define", "remindme", "select", "wikipedia", "zyn"];
 
 fn abbreviate(command: &str) -> &str {
     for abbr in ABBREVIATE.into_iter() {
@@ -33,10 +34,10 @@ pub fn respond(
     message: &str
 ) -> Result<(), IrcError> {
     let (command_base, content) = match message.find(' ') {
-        None    => (message.to_lowercase(), "".to_string()),
+        None    => (message.to_lowercase(), "".to_owned()),
         Some(i) => {
             let (command, content) = message.split_at(i);
-            (command.to_lowercase(), content[1..].to_string())
+            (command.to_lowercase(), content[1..].to_owned())
         }
     };
 
@@ -184,10 +185,21 @@ pub fn respond(
         }
     },
 
+    "select" => {
+        match content.parse() {
+            Err(_) => wrong(),
+            Ok(0)  => wrong(),
+            Ok(i)  => match db.choices.run_choice(i) {
+                Ok(result) => reply(&result),
+                Err(_)     => reply(NO_RESULTS)
+            }
+        }
+    },
+
     "wikipedia" => {
         if len == 0 {
             wrong()
-        } else if let Ok(result) = wikipedia::search(&content) {
+        } else if let Ok(result) = wikipedia::search(db, &content) {
             reply(&result)
         } else {
             reply(NO_RESULTS)
@@ -203,8 +215,8 @@ pub fn respond(
 }
 
 fn usage(command: &str) -> String {
-    let noargs = format!("Usage: {}.", command);
-    let args = |xs| format!("Usage: {} {}.", command, xs);
+    let noargs = format!("Usage: \x02{}\x02.", command);
+    let args = |xs| format!("Usage: \x02{}\x02 {}.", command, xs);
     if command == "auth" {
         args("level user")
     } else if "choose".starts_with(command) {
@@ -225,6 +237,8 @@ fn usage(command: &str) -> String {
         noargs
     } else if command == "reload" {
         noargs
+    } else if "select".starts_with(&command) {
+        args("number")
     } else if "remindme".starts_with(&command) {
         format!("Usage: {} [<days>d][<hours>h][<minutes>m] message. Example: [{} 4h30m Fix my voice filter.]", command, command)
     } else if "wikipedia".starts_with(&command) {

@@ -9,6 +9,7 @@ use std::time::SystemTime;
 use super::*;
 use super::models::*;
 use super::schema;
+use super::response::choice::Choices;
 use super::wikidot::Wikidot;
 
 fn drain_filter<F, T>(vec: &mut Vec<T>, filter: F) -> Vec<T> where F: Fn(&T) -> bool {
@@ -40,19 +41,21 @@ fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: K, v: V) -> bo
 }
 
 pub struct Db {
-    nick:       String,
-    conn:       PgConnection,
-    properties: HashMap<String, String>,
-    reminders:  MultiMap<String, Reminder>,
-    silences:   MultiMap<String, String>,
-    users:      HashMap<String, User>,
-    pub wiki:   Option<Wikidot>
+    pub choices: Choices,
+    conn:        PgConnection,
+    nick:        String,
+    properties:  HashMap<String, String>,
+    reminders:   MultiMap<String, Reminder>,
+    silences:    MultiMap<String, String>,
+    users:       HashMap<String, User>,
+    pub wiki:    Option<Wikidot>
 }
 
 impl Db {
     pub fn new() -> Db {
         let conn = establish_connection();
         Db {
+            choices:    Choices::new(),
             nick:       from_env("IRC_NICK").to_lowercase(),
             properties: load_properties(&conn), 
             reminders:  load_reminders(&conn),

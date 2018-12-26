@@ -37,7 +37,7 @@ pub fn search(query: &str) -> IO<String> {
     let search_res = client.get(&format!("http://ninjawords.com/{}", encode(query))).send()?;
     let page = Document::from_read(search_res)?;
     let mut defs = MultiMap::new();
-    let mut article = "".to_string();
+    let mut article = "".to_owned();
     let title = page.find(Class("title-word")).next().ok_or(SimpleError::new("Word not found."))?;
     let word_line = title.text();
     let word = word_line.trim();
