@@ -1,6 +1,7 @@
 #[macro_use] extern crate diesel;
 extern crate dotenv;
 extern crate failure;
+extern crate humantime;
 #[macro_use] extern crate lazy_static;
 extern crate percent_encoding;
 extern crate regex;
@@ -62,21 +63,23 @@ fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<()
     let m_target = message.response_target().to_owned();
     match (m_prefix, m_target, message.command.to_owned()) {
         (Some(prefix), Some(target), Command::PRIVMSG(_, msg)) => {
-            let commands = get_commands(&msg);
-            if commands.is_empty() {
-                print!("{}", message);
-            } else {
-                log_part(color::ASK, &message.to_string());
-                if let Some(source) = prefix.split("!").next() {
+            if let Some(source) = prefix.split("!").next() {
+                let commands = get_commands(&msg);
+                if commands.is_empty() {
+                    print!("{}", message);
+                } else {
+                    log_part(color::ASK, &message.to_string());
                     if let Some(reminders) = db.get_reminders(source) {
                         for x in reminders {
                             client.privmsg(source, &format!("Reminder: {}", x.message))?
+                      
                         }
-                    }
+                    } 
                     for command in commands {
                         response::respond(db, client, source, target, command)?
                     }
                 }
+            db::log(db.add_seen(&source, &msg))
             }
         },
         _ => print!("{}", message)

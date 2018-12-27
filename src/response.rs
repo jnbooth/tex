@@ -3,7 +3,8 @@ use std::borrow::ToOwned;
 use std::time::SystemTime;
 use rand::Rng;
 
-pub use super::db::Db;
+use super::db;
+use super::db::Db;
 use super::color;
 use super::color::log;
 use super::responder::Responder;
@@ -12,11 +13,13 @@ pub mod choice;
 mod dictionary;
 mod reminder;
 mod roll;
+mod seen;
 mod wikipedia;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
-const ABBREVIATE: [&str; 6] = ["choose", "define", "remindme", "select", "wikipedia", "zyn"];
+const ABBREVIATE: [&str; 7] = 
+        ["choose", "define", "remindme", /*"search",*/ "seen", "select", "wikipedia", "zyn"];
 
 fn abbreviate(command: &str) -> &str {
     for abbr in ABBREVIATE.into_iter() {
@@ -73,7 +76,7 @@ pub fn respond<T: Responder>(
             if !db.outranks(source, &nick) {
                 unauth()
             } else {
-                log_db(db.add_user(auth, &nick));
+                db::log(db.add_user(auth, &nick));
                 reply(&format!("Promoting {} to rank {}.", nick, auth))
             }
         } else {
@@ -105,7 +108,7 @@ pub fn respond<T: Responder>(
             wrong()
         } else {
             let disable = abbreviate(&content);
-            log_db(db.set_enabled(target, disable, false));
+            db::log(db.set_enabled(target, disable, false));
             reply(&format!("[{}] disabled.", disable))
         }
     },
@@ -117,7 +120,7 @@ pub fn respond<T: Responder>(
             wrong()
         } else {
             let enable = abbreviate(&content);
-            log_db(db.set_enabled(target, enable, true));
+            db::log(db.set_enabled(target, enable, true));
             reply(&format!("[{}] enabled.", enable))
         }
     },
@@ -179,7 +182,7 @@ pub fn respond<T: Responder>(
             wrong()
         } else if let Some(offset) = reminder::parse_offset(&args[0]) {
             let when = SystemTime::now() + offset;
-            log_db(db.add_reminder(source, when, &args[1..].join(" ")));
+            db::log(db.add_reminder(source, when, &args[1..].join(" ")));
             reply("Reminder added.")
         } else {
             wrong()
@@ -188,11 +191,34 @@ pub fn respond<T: Responder>(
 
     "roll" => {
         if len == 0 {
-            wrong ()
+            wrong()
         } else if let Ok(throw) = roll::throw(&content) {
-            reply(&throw)
+            reply(&format!("{} (rolled {})", throw, content))
         } else {
-            reply("That wasn't formatted correctly.")
+            reply("Invalid roll.")
+        }
+    },
+
+    "seen" => {
+        use self::seen::Mode;
+        let mode = if len == 1 {
+            Mode::Regular
+        } else if len != 2 {
+            Mode::Invalid
+        } else if args[0].len() == 2 && args[0].starts_with('-') {
+            seen::mode(&args[0])
+        } else if args[1].len() == 2 && args[1].starts_with('-') {
+            seen::mode(&args[1])
+        } else {
+            Mode::Invalid
+        };
+
+        if mode == Mode::Invalid {
+            wrong()
+        } else if let Some(result) = seen::search(db, source, mode) {
+            reply(&result)
+        } else {
+            reply(NO_RESULTS)
         }
     },
 
@@ -249,7 +275,9 @@ fn usage(command: &str) -> String {
     } else if command == "reload" {
         noargs
     } else if command == "roll" {
-        "TODO".to_string()
+        "Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF], [roll 2d6>3 + 10].".to_string()
+    } else if "seen".starts_with(&command) {
+        args("[-f|-t] name")
     } else if "select".starts_with(&command) {
         args("number")
     } else if "remindme".starts_with(&command) {
@@ -265,10 +293,4 @@ fn usage(command: &str) -> String {
 
 fn warn(msg: &str) -> Result<(), IrcError> {
     Ok(log(color::WARN, msg))
-}
-
-fn log_db(res: Result<(), diesel::result::Error>) {
-    if let Err(e) = res {
-        log(color::WARN, &format!("DB error: {}", e));
-    }
 }

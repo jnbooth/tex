@@ -6,11 +6,17 @@ use std::collections::HashMap;
 use std::iter::*;
 use std::time::SystemTime;
 
+use super::color;
 use super::from_env;
 use super::models::*;
-use super::schema;
 use super::response::choice::Choices;
 use super::wikidot::Wikidot;
+
+pub fn log<T>(res: QueryResult<T>) {
+    if let Err(e) = res {
+        color::log(color::WARN, &format!("DB error: {}", e));
+    }
+}
 
 fn drain_filter<F, T>(vec: &mut Vec<T>, filter: F) -> Vec<T> where F: Fn(&T) -> bool {
     let mut drained = Vec::new();
@@ -90,48 +96,86 @@ impl Db {
         self.get_auth(x) > self.get_auth(y)
     }
 
-    pub fn add_user(&mut self, auth: i32, nick_up: &str) -> Result<(), diesel::result::Error> {
+    pub fn add_user(&mut self, auth: i32, nick_up: &str) -> QueryResult<()> {
+        use super::schema::user;
         let nick = nick_up.to_lowercase();
         let user = User {
             nick: nick.to_owned(),
             auth,
             pronouns: self.users.get(&nick).and_then(|x| x.pronouns.to_owned())
         };
-        diesel::insert_into(schema::user::table)
+        diesel::insert_into(user::table)
             .values(&user)
-            .on_conflict(schema::user::nick)
+            .on_conflict(user::nick)
             .do_update()
-            .set(schema::user::auth.eq(auth))
+            .set(user::auth.eq(auth))
             .execute(&self.conn)?;
         self.users.insert(nick, user);
         Ok(())
     }
 
-    pub fn delete_user(&mut self, nick_up: &str) -> Result<bool, diesel::result::Error> {
+    pub fn delete_user(&mut self, nick_up: &str) -> QueryResult<bool> {
+        use super::schema::user;
         let nick = nick_up.to_lowercase();
         let removed = self.users.remove(&nick);
-        diesel::delete(schema::user::table.filter(schema::user::nick.eq(nick)))
+        diesel::delete(user::table.filter(user::nick.eq(nick)))
             .execute(&self.conn)?;
         Ok(removed.is_some())
     }
 
+    pub fn add_seen(&mut self, nick_up: &str, message: &str) -> QueryResult<()> {
+        use super::schema::seen;
+        let nick = nick_up.to_lowercase();
+        let when = SystemTime::now();
+        let seen = Seen { 
+            nick, 
+            first:  message.to_owned(), first_time:  when, 
+            latest: message.to_owned(), latest_time: when,
+            total:  1 
+        };
+        diesel::insert_into(seen::table)
+            .values(&seen)
+            .on_conflict(seen::nick)
+            .do_update()
+            .set((
+                seen::latest.eq(message),
+                seen::latest_time.eq(when),
+                seen::total.eq(seen::total + 1)
+            ))
+            .execute(&self.conn)?;
+        Ok(())
+    }
+
+    pub fn get_seen(&self, nick_up: &str) -> Option<Seen> {
+        use super::schema::seen;
+        let nick = nick_up.to_lowercase();
+        seen::table
+            .filter(seen::nick.eq(nick))
+            .limit(1)
+            .load(&self.conn)
+            .expect("Error loading seen messages")
+            .pop()
+    }
+
     pub fn add_reminder(&mut self, nick_up: &str, when: SystemTime, message: &str) 
-    -> Result<(), diesel::result::Error>{
+    -> QueryResult<()> {
+        use super::schema::reminder;
         let reminder = DbReminder {
             nick:    nick_up.to_lowercase(),
             when:    when,
             message: message.to_owned()
         };
-        diesel::insert_into(schema::reminder::table)
+        diesel::insert_into(reminder::table)
             .values(&reminder)
             .execute(&self.conn)?;
         Ok(())
     }
     pub fn get_reminders(&mut self, nick_up: &str) -> Option<Vec<Reminder>> {
+        use super::schema::reminder;
         let when = SystemTime::now();
         let mut reminders = self.reminders.get_vec_mut(&nick_up.to_lowercase())?;
         let expired = drain_filter(&mut reminders, |x| x.when < when);
-        diesel::delete(schema::reminder::table.filter(schema::reminder::when.lt(when)))
+        diesel::delete(reminder::table.filter(reminder::when.lt(when)))
             .execute(&self.conn).ok();
         Some(expired)
     }
@@ -143,17 +187,17 @@ impl Db {
         }
     }
 
-    pub fn set_enabled(&mut self, channel: &str, command: &str, enabled: bool) 
-    -> Result<(), diesel::result::Error> {
+    pub fn set_enabled(&mut self, channel: &str, command: &str, enabled: bool) -> QueryResult<()> {
+        use super::schema::silence;
         if enabled {
             multi_remove(&mut self.silences, channel.to_owned(), command.to_owned());
-            diesel::delete(schema::silence::table
-                .filter(schema::silence::channel.eq(channel))
-                .filter(schema::silence::command.eq(command))
+            diesel::delete(silence::table
+                .filter(silence::channel.eq(channel))
+                .filter(silence::command.eq(command))
             ).execute(&self.conn)?;
         } else {
             self.silences.insert(channel.to_owned(), command.to_owned());
-            diesel::insert_into(schema::silence::table)
+            diesel::insert_into(silence::table)
                 .values(DbSilence { channel: channel.to_owned(), command: command.to_owned() })
                 .execute(&self.conn)?;
         }
@@ -168,8 +212,9 @@ fn establish_connection() -> PgConnection {
 }
 
 fn load_properties(conn: &PgConnection) -> HashMap<String, String> {
+    use super::schema::property;
     HashMap::from_iter(
-        schema::property::table.load(conn)
+        property::table.load(conn)
             .expect("Error loading properties")
             .into_iter()
             .map(|x: Property| (x.key, x.value))
@@ -177,8 +222,9 @@ fn load_properties(conn: &PgConnection) -> HashMap<String, String> {
 }
 
 fn load_reminders(conn: &PgConnection) -> MultiMap<String, Reminder> {
+    use super::schema::reminder;
     MultiMap::from_iter(
-        schema::reminder::table.load(conn)
+        reminder::table.load(conn)
             .expect("Error loading reminders")
             .into_iter()
             .map(|x: Reminder| (x.nick.to_owned(), x))
@@ -186,8 +232,9 @@ fn load_reminders(conn: &PgConnection) -> MultiMap<String, Reminder> {
 }
 
 fn load_silences(conn: &PgConnection) -> MultiMap<String, String> {
+    use super::schema::silence;
     MultiMap::from_iter(
-        schema::silence::table.load(conn)
+        silence::table.load(conn)
             .expect("Error loading reminders")
             .into_iter()
             .map(|x: Silence| (x.channel, x.command))
@@ -195,8 +242,9 @@ fn load_silences(conn: &PgConnection) -> MultiMap<String, String> {
 }
 
 fn load_users(conn: &PgConnection) -> HashMap<String, User> {
+    use super::schema::user;
     HashMap::from_iter(
-        schema::user::table.load(conn)
+        user::table.load(conn)
             .expect("Error loading users")
             .into_iter()
             .map(|x: User| (x.nick.to_owned(), x))

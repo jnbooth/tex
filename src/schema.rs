@@ -34,6 +34,17 @@ table! {
 }
 
 table! {
+    seen (nick) {
+        nick -> Varchar,
+        first -> Varchar,
+        first_time -> Timestamp,
+        latest -> Varchar,
+        latest_time -> Timestamp,
+        total -> Int4,
+    }
+}
+
+table! {
     silence (id) {
         id -> Int4,
         command -> Varchar,
@@ -64,6 +75,7 @@ allow_tables_to_appear_in_same_query!(
     page,
     property,
     reminder,
+    seen,
     silence,
     tell,
     user,

@@ -1,5 +1,6 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 use std::time::SystemTime;
+use super::schema::*;
 
 #[derive(Queryable)]
 pub struct Property {
@@ -7,7 +8,6 @@ pub struct Property {
     pub value: String
 }
 
-use super::schema::reminder;
 #[derive(Insertable)]
 #[table_name = "reminder"]
 pub struct DbReminder {
@@ -23,7 +23,17 @@ pub struct Reminder {
     pub message: String
 }
 
-use super::schema::silence;
+#[derive(Insertable, Queryable)]
+#[table_name = "seen"]
+pub struct Seen {
+    pub nick: String,
+    pub first: String,
+    pub first_time: SystemTime,
+    pub latest: String,
+    pub latest_time: SystemTime,
+    pub total: i32
+}
+
 #[derive(Insertable)]
 #[table_name = "silence"]
 pub struct DbSilence {
@@ -37,7 +47,6 @@ pub struct Silence {
     pub channel: String
 }
 
-use super::schema::user;
 #[derive(Insertable, Queryable)]
 #[table_name = "user"]
 pub struct User {
