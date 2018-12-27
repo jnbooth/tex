@@ -6,11 +6,12 @@ use rand::Rng;
 pub use super::db::Db;
 use super::color;
 use super::color::log;
+use super::responder::Responder;
 
 pub mod choice;
 mod dictionary;
 mod reminder;
-pub mod responder;
+mod roll;
 mod wikipedia;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
@@ -26,7 +27,7 @@ fn abbreviate(command: &str) -> &str {
     command
 }
 
-pub fn respond<T: responder::Responder>(
+pub fn respond<T: Responder>(
     db: &mut Db, 
     client: &T, 
     source: &str, 
@@ -185,6 +186,16 @@ pub fn respond<T: responder::Responder>(
         }
     },
 
+    "roll" => {
+        if len == 0 {
+            wrong ()
+        } else if let Ok(throw) = roll::throw(&content) {
+            reply(&throw)
+        } else {
+            reply("That wasn't formatted correctly.")
+        }
+    },
+
     "select" => {
         match content.parse() {
             Err(_) => wrong(),
@@ -237,6 +248,8 @@ fn usage(command: &str) -> String {
         noargs
     } else if command == "reload" {
         noargs
+    } else if command == "roll" {
+        "TODO".to_string()
     } else if "select".starts_with(&command) {
         args("number")
     } else if "remindme".starts_with(&command) {

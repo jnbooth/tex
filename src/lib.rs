@@ -16,19 +16,25 @@ use dotenv::dotenv;
 use irc::client::prelude::*;
 use irc::error::IrcError;
 use std::iter::*;
+use simple_error::SimpleError;
 
 mod color;
 mod db;
 mod models;
+mod responder;
 mod response;
 mod schema;
 mod wikidot;
 
-use self::db::Db;
 use self::color::log_part;
-use self::response::responder::Responder;
+use self::db::Db;
+use self::responder::Responder;
 
 pub type IO<T> = Result<T, Box<std::error::Error>>;
+
+pub fn ErrIO<T>(e: &str) -> IO<T> {
+    Err(Box::new(SimpleError::new(e)))
+}
 
 pub fn run() -> Result<(), IrcError> {
     dotenv().ok();

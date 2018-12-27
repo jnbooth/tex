@@ -1,8 +1,8 @@
 use irc::client::prelude::*;
 use irc::error::IrcError;
 
-use super::super::color;
-use super::super::color::log;
+use super::color;
+use super::color::log;
 
 pub trait Responder {
     fn action(&self, target: &str, msg: &str) -> Result<(), IrcError>;

@@ -5,6 +5,7 @@ use simple_error::SimpleError;
 
 use super::super::db::Db;
 use super::super::IO;
+use super::super::ErrIO;
 use super::choice;
 
 const CHARACTER_LIMIT: usize = 300;
@@ -118,7 +119,7 @@ pub fn search(db: &mut Db, query: &str) -> IO<String> {
             for link in ambig {
                 db.choices.add(move || match search_in(&link) {
                     Ok(Ok(entry)) => Ok(entry),
-                    Ok(Err(_))    => Err(Box::new(SimpleError::new("Couldn't disambiguate."))),
+                    Ok(Err(_))    => ErrIO("Couldn't disambiguate."),
                     Err(e)        => Err(e)
                 })
             }
