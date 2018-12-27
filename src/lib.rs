@@ -48,6 +48,11 @@ fn from_env(var: &str) -> String {
     std::env::var(var).expect(&format!("{} must be set in ./.env", var))
 }
 
+fn from_env_opt(var: &str) -> Option<String> {
+    let res = std::env::var(var).ok()?.trim().to_owned();
+    if res.is_empty() { None } else { Some(res) }
+}
+
 fn get_config() -> Config {
     Config {
         server:   Some(from_env("IRC_SERVER")),

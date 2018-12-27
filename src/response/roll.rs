@@ -23,18 +23,14 @@ pub fn throw(s: &str) -> IO<String> {
                     _   => Err(failure::err_msg(format!("{} is neither '+' nor '-'.", sign)))?
                 };
                 match die.find('d') {
-                    None    => {
+                    None => {
                         let bonus: u32 = die.parse()?;
                         score = score + signum * bonus as i64;
                     },
                     Some(i) => {
                         let (before, after_raw) = die.split_at(i);
                         let mut after = after_raw[1..].to_string();
-                        let amount: u16 = if before.is_empty() {
-                            1
-                        } else {
-                            before.parse()?
-                        };
+                        let amount: u16 = if before.is_empty() { 1 } else { before.parse()? };
                         let (cmp, threshold) = if let Some(i) = after.find('>') {
                             (1, after.split_off(i)[1..].parse()?)
                         } else if let Some(i) = after.find('<') {

@@ -7,7 +7,7 @@ use std::iter::*;
 use std::time::SystemTime;
 
 use super::color;
-use super::from_env;
+use super::{from_env, from_env_opt};
 use super::models::*;
 use super::response::choice::Choices;
 use super::wikidot::Wikidot;
@@ -50,6 +50,7 @@ pub struct Db {
     pub choices: Choices,
     conn:        PgConnection,
     nick:        String,
+    owner:       Option<String>,
     properties:  HashMap<String, String>,
     reminders:   MultiMap<String, Reminder>,
     silences:    MultiMap<String, String>,
@@ -63,11 +64,12 @@ impl Db {
         Db {
             choices:    Choices::new(),
             nick:       from_env("IRC_NICK").to_lowercase(),
-            properties: load_properties(&conn), 
+            owner:      from_env_opt("OWNER").map(|x| x.to_lowercase()),
+            properties: load_properties(&conn),
             reminders:  load_reminders(&conn),
             silences:   load_silences(&conn),
-            users:      load_users(&conn), 
-            wiki:       Wikidot::new(), 
+            users:      load_users(&conn),
+            wiki:       Wikidot::new(),
             conn 
         }
     }
@@ -81,8 +83,10 @@ impl Db {
 
     fn get_auth(&self, user: &str) -> i32 {
         let lower = user.to_lowercase();
-        if lower == self.nick {
+        if self.nick == lower {
             5
+        } else if self.owner == Some(lower.to_owned()) {
+            4
         } else { 
             self.users.get(&lower).map(|x| x.auth).unwrap_or(0) 
         }

@@ -2,6 +2,7 @@
 
 use xmlrpc::Value;
 use super::IO;
+use super::from_env_opt;
 
 pub struct Wikidot {
     url: String
@@ -9,8 +10,8 @@ pub struct Wikidot {
 
 impl Wikidot {
     pub fn new() -> Option<Wikidot> {
-        let user = std::env::var("WIKIDOT_USER").ok()?;
-        let key = std::env::var("WIKIDOT_KEY").ok()?;
+        let user = from_env_opt("WIKIDOT_USER")?;
+        let key = from_env_opt("WIKIDOT_KEY")?;
         Some(Wikidot { url: format!("https://{}:{}@www.wikidot.com/xml-rpc-api.php", user, key) })
     }
     
