@@ -1,11 +1,9 @@
 use percent_encoding::utf8_percent_encode;
 use regex::Regex;
 use serde_json::{Map, Value};
-use simple_error::SimpleError;
 
 use super::super::db::Db;
 use super::super::IO;
-use super::super::ErrIO;
 use super::choice;
 
 const CHARACTER_LIMIT: usize = 300;
@@ -101,13 +99,13 @@ fn search_in(query: &str) -> IO<Result<String, Vec<String>>> {
         encode(query)
     )).send()?;
     let search_json = serde_json::from_reader(search_res)?;
-    let page = get_page(&search_json).ok_or(SimpleError::new("Page not found"))?;
+    let page = get_page(&search_json).ok_or(failure::err_msg("Page not found"))?;
     let entry_res = client.get(&format!(
         "https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|links&pllimit=100&exintro&explaintext&redirects=1&pageids={}",
         encode(&page.to_string())
     )).send()?;
     let entry_json = serde_json::from_reader(entry_res)?;
-    Ok(get_entry(page, &entry_json).ok_or(SimpleError::new("Entry not found"))?)
+    Ok(get_entry(page, &entry_json).ok_or(failure::err_msg("Entry not found"))?)
 }
 pub fn search(db: &mut Db, query: &str) -> IO<String> {
     let searched = search_in(query)?;
@@ -119,7 +117,7 @@ pub fn search(db: &mut Db, query: &str) -> IO<String> {
             for link in ambig {
                 db.choices.add(move || match search_in(&link) {
                     Ok(Ok(entry)) => Ok(entry),
-                    Ok(Err(_))    => ErrIO("Couldn't disambiguate."),
+                    Ok(Err(_))    => Err(failure::err_msg("Couldn't disambiguate.")),
                     Err(e)        => Err(e)
                 })
             }

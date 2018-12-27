@@ -2,7 +2,6 @@ use multimap::MultiMap;
 use percent_encoding::utf8_percent_encode;
 use select::document::Document;
 use select::predicate::{Class, Name};
-use simple_error::SimpleError;
 
 use super::super::IO;
 
@@ -25,7 +24,7 @@ fn stringify(word: &str, defs: &MultiMap<String, String>) -> String {
             s.push_str(&i.to_string());
             s.push_str(". ");
             s.push_str(v);
-            i = i + 1;
+            i += 1;
         }
     }
     s
@@ -37,7 +36,7 @@ pub fn search(query: &str) -> IO<String> {
     let page = Document::from_read(search_res)?;
     let mut defs = MultiMap::new();
     let mut article = "".to_owned();
-    let title = page.find(Class("title-word")).next().ok_or(SimpleError::new("Word not found."))?;
+    let title = page.find(Class("title-word")).next().ok_or(failure::err_msg("Word not found."))?;
     let word_line = title.text();
     let word = word_line.trim();
     for node in page.find(Name("dd")) {

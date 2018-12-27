@@ -3,24 +3,22 @@ use super::super::IO;
 
 const CHARACTER_LIMIT: usize = 429;
 
-pub struct Choices {
-    choices: Vec<Box<Fn() -> IO<String>>>
-}
+pub struct Choices(Vec<Box<Fn() -> IO<String>>>);
 impl Choices {
     pub fn new() -> Choices {
-        Choices { choices: Vec::new() }
+        Choices(Vec::new())
     }
 
     pub fn add<F>(&mut self, callback: F) where F: 'static + Fn() -> IO<String> {
-        self.choices.push(Box::new(callback));
+        self.0.push(Box::new(callback));
     }
 
     pub fn clear(&mut self) {
-        self.choices.clear();
+        self.0.clear();
     }
 
     pub fn run_choice(&mut self, i: usize) -> IO<String> {
-        match self.choices.get(i - 1) {
+        match self.0.get(i - 1) {
             Some(choice) => (choice)(),
             None => Ok("That isn't one of my choices.".to_string())
         }
@@ -34,7 +32,7 @@ pub fn suggest(suggestions: &Vec<String>) -> String {
         let mut s = "Did you mean:".to_owned();
         let mut i = 0;
         for suggest in suggestions {
-            i = i + 1;
+            i += 1;
             if s.len() + suggest.len() + 7 > CHARACTER_LIMIT {
                 return s.to_owned()
             }

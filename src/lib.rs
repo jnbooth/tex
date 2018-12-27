@@ -1,22 +1,19 @@
-#[macro_use]
-extern crate diesel;
+#[macro_use] extern crate diesel;
 extern crate dotenv;
+extern crate failure;
+#[macro_use] extern crate lazy_static;
 extern crate percent_encoding;
-#[macro_use]
-extern crate lazy_static;
 extern crate regex;
 extern crate reqwest;
 extern crate select;
 extern crate serde;
 extern crate serde_json;
-extern crate simple_error;
 extern crate xmlrpc;
 
 use dotenv::dotenv;
 use irc::client::prelude::*;
 use irc::error::IrcError;
 use std::iter::*;
-use simple_error::SimpleError;
 
 mod color;
 mod db;
@@ -30,11 +27,7 @@ use self::color::log_part;
 use self::db::Db;
 use self::responder::Responder;
 
-pub type IO<T> = Result<T, Box<std::error::Error>>;
-
-pub fn ErrIO<T>(e: &str) -> IO<T> {
-    Err(Box::new(SimpleError::new(e)))
-}
+pub type IO<T> = Result<T, failure::Error>;
 
 pub fn run() -> Result<(), IrcError> {
     dotenv().ok();
@@ -45,8 +38,9 @@ pub fn run() -> Result<(), IrcError> {
     client.identify()?;
 
     reactor.register_client_with_handler(client, move |c, m| handler(&mut db, c, m));
+    reactor.run()?;
 
-    reactor.run()
+    Ok(())
 }
 
 fn from_env(var: &str) -> String {

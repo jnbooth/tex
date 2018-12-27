@@ -129,7 +129,7 @@ pub fn respond<T: Responder>(
             wrong()
         } else { 
             match db.delete_user(&content) {
-                Err(e)    => warn(&format!("DB Error: {}", e)),
+                Err(e)    => warn(&format!("DB error: {}", e)),
                 Ok(true)  => reply(&format!("Forgot {}.", content)),
                 Ok(false) => reply(&format!("I don't know {}.", content)),
             }

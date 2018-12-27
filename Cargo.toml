@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 diesel = { version = "*", features = ["postgres"] }
 dotenv = "*"
+failure = "*"
 irc = "*"
 lazy_static = "*"
 multimap = "*"
@@ -18,5 +19,4 @@ select = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
-simple-error = "*"
 xmlrpc = "*"
