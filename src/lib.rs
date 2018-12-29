@@ -25,6 +25,7 @@ mod responder;
 mod response;
 mod schema;
 mod wikidot;
+mod vec;
 
 use self::color::log_part;
 use self::db::Db;

@@ -11,24 +11,12 @@ use super::color;
 use super::models::*;
 use super::response::choice::Choices;
 use super::wikidot::Wikidot;
+use super::vec::drain_filter;
 
 pub fn log<T>(res: QueryResult<T>) {
     if let Err(e) = res {
         color::log(color::WARN, &format!("DB error: {}", e));
     }
-}
-
-fn drain_filter<F, T>(vec: &mut Vec<T>, filter: F) -> Vec<T> where F: Fn(&T) -> bool {
-    let mut drained = Vec::new();
-    let mut i = 0;
-    while i != vec.len() {
-        if filter(&vec[i]) {
-            drained.push(vec.remove(i));
-        } else {
-            i += 1;
-        }
-    }
-    drained
 }
 
 fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: K, v: V) -> bool {

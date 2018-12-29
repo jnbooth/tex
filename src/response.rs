@@ -61,9 +61,9 @@ pub fn respond<T: Responder>(
         return warn(&format!("{} attempted to use a silenced command: {}!", target, command))
     }
 
-    let args: Vec<String> = content
+    let args: Vec<&str> = content
         .split(' ')
-        .map(ToOwned::to_owned)
+        //.map(ToOwned::to_owned)
         .filter(|x| !x.is_empty())
         .collect();
     let len = args.len();
@@ -240,25 +240,10 @@ pub fn respond<T: Responder>(
     },
 
     "seen" => {
-        use self::seen::Mode;
-        let mode = if len == 1 {
-            Mode::Regular
-        } else if len != 2 {
-            Mode::Invalid
-        } else if args[0].len() == 2 && args[0].starts_with('-') {
-            seen::mode(&args[0])
-        } else if args[1].len() == 2 && args[1].starts_with('-') {
-            seen::mode(&args[1])
-        } else {
-            Mode::Invalid
-        };
-
-        if mode == Mode::Invalid {
-            wrong()
-        } else if let Some(result) = seen::search(db, target, source, mode) {
-            reply(&result)
-        } else {
-            reply(NO_RESULTS)
+        match seen::search(db, target, &args) {
+            Err(seen::Error::InvalidArgs) => wrong(),
+            Err(seen::Error::NotFound)    => reply(NO_RESULTS),
+            Ok(result)                    => reply(&result)
         }
     },
 
@@ -330,7 +315,7 @@ fn usage(command: &str) -> String {
     } else if command == "roll" {
         "Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF-2], [roll 2d6>3 - 1d4].".to_string()
     } else if "seen".starts_with(&command) {
-        args("[-f|-t] user")
+        args("[-f|-t] user [#channel]")
     } else if "select".starts_with(&command) {
         args("number")
     } else if "remindme".starts_with(&command) {

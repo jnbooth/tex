@@ -76,9 +76,9 @@ Randomly roll some dice. Basic dice notation follows the format of `<# of dice>d
 
 #### [seen], [se]
 
-__Usage:__ `seen [-f|-t] nick`
+__Usage:__ `seen [-f|-t] nick [#channel]`
 
-With no flags, display the most recent message seen from a user and how long ago it occurred. With `-f`, display the first message seen from a user and how long ago it occurred. With `-t`, display the total number of messages seen from a user. Note: `/me` emotes are ignored.
+With no flags, display the most recent message seen from a user and how long ago it occurred. With `-f`, display the first message seen from a user and how long ago it occurred. With `-t`, display the total number of messages seen from a user. Note: `/me` emotes are ignored. If a channel is not given, the current channel is used.
 
 #### [select], [sel]
 

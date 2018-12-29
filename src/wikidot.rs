@@ -2,7 +2,7 @@
 
 use xmlrpc::Value;
 use super::IO;
-use super::Api;
+use super::Api;  
 
 pub struct Wikidot {
     url: String
