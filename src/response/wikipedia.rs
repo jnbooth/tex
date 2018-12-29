@@ -1,4 +1,3 @@
-use percent_encoding::utf8_percent_encode;
 use regex::Regex;
 use serde_json::{Map, Value};
 
@@ -9,7 +8,7 @@ use super::choice;
 const CHARACTER_LIMIT: usize = 300;
 
 fn encode(s: &str) -> String {
-    utf8_percent_encode(&s.replace(" ", "_"), percent_encoding::DEFAULT_ENCODE_SET).to_string()
+    super::super::encode(&s.replace(" ", "_"))
 }
 
 fn clean_content(s: &str) -> String {
@@ -107,6 +106,7 @@ fn search_in(query: &str) -> IO<Result<String, Vec<String>>> {
     let entry_json = serde_json::from_reader(entry_res)?;
     Ok(get_entry(page, &entry_json).ok_or(failure::err_msg("Entry not found"))?)
 }
+
 pub fn search(db: &mut Db, query: &str) -> IO<String> {
     let searched = search_in(query)?;
     match searched {

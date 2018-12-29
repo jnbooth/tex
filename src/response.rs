@@ -11,6 +11,7 @@ use super::responder::Responder;
 
 pub mod choice;
 mod dictionary;
+mod google;
 mod reminder;
 mod roll;
 mod seen;
@@ -18,8 +19,16 @@ mod wikipedia;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
-const ABBREVIATE: [&str; 7] = 
-        ["choose", "define", "remindme", /*"search",*/ "seen", "select", "wikipedia", "zyn"];
+const ABBREVIATE: [&str; 8] =
+        [ "choose"
+        , "define"
+        , "google"
+        , "remindme"
+        , "seen"
+        , "select"
+        , "wikipedia"
+        , "zyn"
+        ];
 
 fn abbreviate(command: &str) -> &str {
     for abbr in ABBREVIATE.into_iter() {
@@ -94,7 +103,7 @@ pub fn respond<T: Responder>(
     "define" => {
         if len == 0 {
             wrong()
-        } else if let Ok(result) = dictionary::search(&content) {
+        } else if let Ok(result) = dictionary::search(&db.client, &content) {
             reply(&result)
         } else {
             reply(NO_RESULTS)
@@ -135,6 +144,36 @@ pub fn respond<T: Responder>(
                 Err(e)    => warn(&format!("DB error: {}", e)),
                 Ok(true)  => reply(&format!("Forgot {}.", content)),
                 Ok(false) => reply(&format!("I don't know {}.", content)),
+            }
+        }
+    },
+
+    "gis" => {
+        match &db.api.google {
+            None      => Ok(()),
+            Some(api) => {
+                if len == 0 {
+                    wrong()
+                } else if let Ok(result) = google::search_image(&api, &db.client, &content) {
+                    reply(&result)
+                } else {
+                    reply(NO_RESULTS)
+                }
+            }
+        }
+    },
+
+    "google" => {
+        match &db.api.google {
+            None      => Ok(()),
+            Some(api) => {
+                if len == 0 {
+                    wrong()
+                } else if let Ok(result) = google::search(&api, &db.client, &content) {
+                    reply(&result)
+                } else {
+                    reply(NO_RESULTS)
+                }
             }
         }
     },
@@ -266,6 +305,10 @@ fn usage(command: &str) -> String {
         args("command")
     } else if command == "forget" {
         args("user")
+    } else if command == "gis" {
+        args("query")
+    } else if "google".starts_with(command) {
+        args("query")
     } else if command == "help" {
         args("command")
     } else if command == "hug" {

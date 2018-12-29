@@ -2,17 +2,17 @@
 
 use xmlrpc::Value;
 use super::IO;
-use super::from_env_opt;
+use super::Api;
 
 pub struct Wikidot {
     url: String
 }
 
 impl Wikidot {
-    pub fn new() -> Option<Wikidot> {
-        let user = from_env_opt("WIKIDOT_USER")?;
-        let key = from_env_opt("WIKIDOT_KEY")?;
-        Some(Wikidot { url: format!("https://{}:{}@www.wikidot.com/xml-rpc-api.php", user, key) })
+    pub fn new(api: Api) -> Wikidot {
+        Wikidot {
+            url: format!("https://{}:{}@www.wikidot.com/xml-rpc-api.php", api.user, api.key) 
+        }
     }
     
     fn xml_rpc(&self, method: &str, params: Vec<(&str, Value)>) -> Result<Value, xmlrpc::Error> {

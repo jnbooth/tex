@@ -2,7 +2,6 @@ use regex::Regex;
 use std::time::Duration;
 
 fn yield_offset(d: u32, h: u32, m: u32) -> Option<Duration> {
-    println!("{}d{}h{}m", d, h, m);
     Some(Duration::from_secs(60 * (m + 60 * (h + 24 * d)) as u64))
 }
 

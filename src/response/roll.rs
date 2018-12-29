@@ -77,7 +77,6 @@ fn roll(rng: &mut ThreadRng, min: i64, max: i64, explode: bool, threshold: i64, 
         side
     };
     
-    //if side > threshold { 1 } else { 0 };
     if explode && side == max {
         score + roll(rng, min, max, explode, threshold, cmp)
     } else {

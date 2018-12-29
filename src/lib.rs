@@ -14,6 +14,7 @@ extern crate xmlrpc;
 use dotenv::dotenv;
 use irc::client::prelude::*;
 use irc::error::IrcError;
+use percent_encoding::utf8_percent_encode;
 use std::iter::*;
 
 mod color;
@@ -28,7 +29,12 @@ use self::color::log_part;
 use self::db::Db;
 use self::responder::Responder;
 
-pub type IO<T> = Result<T, failure::Error>;
+type IO<T> = Result<T, failure::Error>;
+
+pub struct Api {
+    user: String,
+    key: String
+}
 
 pub fn run() -> Result<(), IrcError> {
     dotenv().ok();
@@ -51,6 +57,17 @@ fn from_env(var: &str) -> String {
 fn from_env_opt(var: &str) -> Option<String> {
     let res = std::env::var(var).ok()?.trim().to_owned();
     if res.is_empty() { None } else { Some(res) }
+}
+
+fn from_env_api(prefix: &str, user: &str, key: &str) -> Option<Api> {
+    Some(Api { 
+        user: from_env_opt(&format!("{}_{}", prefix, user))?, 
+        key:  from_env_opt(&format!("{}_{}", prefix, key))? 
+    })
+}
+
+fn encode(s: &str) -> String {
+    utf8_percent_encode(s, percent_encoding::DEFAULT_ENCODE_SET).to_string()
 }
 
 fn get_config() -> Config {
@@ -93,12 +110,16 @@ fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<()
 }
 
 fn get_commands(message: &str) -> Vec<&str> {
-    message
-        .split('[')
-        .skip(1)
-        .filter_map(|x| x.find(']').and_then(|i| {
-            let cmd = x.split_at(i).0.trim();
-            if cmd.is_empty() { None } else { Some(cmd) }
-        }))
-        .collect()
+    match (message.chars().next(), message.get(1..)) {
+        (Some('!'), Some(xs)) => vec![xs],
+        (Some('.'), Some(xs)) => vec![xs],
+        _ => message
+            .split('[')
+            .skip(1)
+            .filter_map(|x| x.find(']').and_then(|i| {
+                let cmd = x.split_at(i).0.trim();
+                if cmd.is_empty() { None } else { Some(cmd) }
+            }))
+            .collect()
+    }
 }

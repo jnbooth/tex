@@ -1,13 +1,8 @@
 use multimap::MultiMap;
-use percent_encoding::utf8_percent_encode;
 use select::document::Document;
 use select::predicate::{Class, Name};
 
-use super::super::IO;
-
-fn encode(s: &str) -> String {
-    utf8_percent_encode(s, percent_encoding::DEFAULT_ENCODE_SET).to_string()
-}
+use super::super::{IO, encode};
 
 fn stringify(word: &str, defs: &MultiMap<String, String>) -> String {
     let mut s = String::new();
@@ -30,8 +25,7 @@ fn stringify(word: &str, defs: &MultiMap<String, String>) -> String {
     s
 }
 
-pub fn search(query: &str) -> IO<String> {
-    let client = reqwest::Client::new();
+pub fn search(client: &reqwest::Client, query: &str) -> IO<String> {
     let search_res = client.get(&format!("http://ninjawords.com/{}", encode(query))).send()?;
     let page = Document::from_read(search_res)?;
     let mut defs = MultiMap::new();

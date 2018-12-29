@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use irc::client::prelude::*;
 use irc::error::IrcError;
 
@@ -28,9 +30,9 @@ impl Responder for IrcClient {
     }
 }
 
-pub struct _Debugger { }
+pub struct Debugger { }
 
-impl Responder for _Debugger {
+impl Responder for Debugger {
     fn action(&self, _: &str, msg: &str) -> Result<(), IrcError> {
         log(color::ECHO, &format!("> /me {}", msg));
         Ok(())

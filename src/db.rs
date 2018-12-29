@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::iter::*;
 use std::time::SystemTime;
 
+use super::{Api, from_env, from_env_opt, from_env_api};
 use super::color;
-use super::{from_env, from_env_opt};
 use super::models::*;
 use super::response::choice::Choices;
 use super::wikidot::Wikidot;
@@ -46,16 +46,31 @@ fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: K, v: V) -> bo
     false
 }
 
+pub struct Apis {
+    pub google:  Option<Api>,
+    pub wikidot: Option<Wikidot>
+}
+
+impl Apis {
+    pub fn new() -> Apis {
+        Apis {
+            google:  from_env_api("GOOGLE", "CUSTOMENGINE", "KEY"),
+            wikidot: from_env_api("WIKIDOT", "USER", "KEY").map(Wikidot::new)
+        }
+    }
+}
+
 pub struct Db {
     pub choices: Choices,
     conn:        PgConnection,
+    pub client:  reqwest::Client,
     nick:        String,
     owner:       Option<String>,
     properties:  HashMap<String, String>,
     reminders:   MultiMap<String, Reminder>,
     silences:    MultiMap<String, String>,
     users:       HashMap<String, User>,
-    pub wiki:    Option<Wikidot>
+    pub api:     Apis
 }
 
 impl Db {
@@ -63,14 +78,15 @@ impl Db {
         let conn = establish_connection();
         Db {
             choices:    Choices::new(),
+            client:     reqwest::Client::new(),
             nick:       from_env("IRC_NICK").to_lowercase(),
             owner:      from_env_opt("OWNER").map(|x| x.to_lowercase()),
             properties: load_properties(&conn),
             reminders:  load_reminders(&conn),
             silences:   load_silences(&conn),
             users:      load_users(&conn),
-            wiki:       Wikidot::new(),
-            conn 
+            api:        Apis::new(),
+            conn
         }
     }
 
