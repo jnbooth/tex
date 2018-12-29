@@ -22,17 +22,21 @@ CREATE TABLE "reminder" (
   "message" CHARACTER VARYING  NOT NULL
 );
 CREATE TABLE "seen" (
-  "nick"        CHARACTER VARYING  PRIMARY KEY,
+  "id"          SERIAL  PRIMARY KEY,
+  "channel"     CHARACTER VARYING  NOT NULL,
+  "nick"        CHARACTER VARYING  NOT NULL,
   "first"       CHARACTER VARYING  NOT NULL,
   "first_time"  TIMESTAMP  NOT NULL,
   "latest"      CHARACTER VARYING  NOT NULL,
   "latest_time" TIMESTAMP  NOT NULL,
-  "total"       INT  NOT NULL  DEFAULT 1
+  "total"       INT  NOT NULL  DEFAULT 1,
+  UNIQUE ("channel", "nick")
 );
 CREATE TABLE "silence" (
   "id"      SERIAL  PRIMARY KEY,
+  "channel" CHARACTER VARYING  NOT NULL,
   "command" CHARACTER VARYING  NOT NULL,
-  "channel" CHARACTER VARYING  NOT NULL
+  UNIQUE ("channel", "command")
 );
 CREATE TABLE "tell" (
   "id"      SERIAL  PRIMARY KEY,

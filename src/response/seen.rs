@@ -24,8 +24,8 @@ fn since(when: SystemTime) -> Result<String, SystemTimeError> {
     ).to_string())
 }
 
-pub fn search(db: &Db, nick_up: &str, mode: Mode) -> Option<String> {
-    let seen = db.get_seen(nick_up)?;
+pub fn search(db: &Db, channel_up: &str, nick_up: &str, mode: Mode) -> Option<String> {
+    let seen = db.get_seen(channel_up, nick_up)?;
     match mode {
         Mode::First => Some(format!(
             "I first saw {} {} ago, saying: {}", 

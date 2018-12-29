@@ -101,7 +101,7 @@ fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<()
                         response::respond(db, client, source, target, command)?
                     }
                 }
-            db::log(db.add_seen(&source, &msg))
+            db::log(db.add_seen(&target, &source, &msg))
             }
         },
         _ => print!("{}", message)

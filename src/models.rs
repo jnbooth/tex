@@ -23,9 +23,22 @@ pub struct Reminder {
     pub message: String
 }
 
-#[derive(Insertable, Queryable)]
+#[derive(Insertable)]
 #[table_name = "seen"]
+pub struct DbSeen {
+    pub channel: String,
+    pub nick: String,
+    pub first: String,
+    pub first_time: SystemTime,
+    pub latest: String,
+    pub latest_time: SystemTime,
+    pub total: i32
+}
+
+#[derive(Queryable)]
 pub struct Seen {
+    _id: i32,
+    pub channel: String,
     pub nick: String,
     pub first: String,
     pub first_time: SystemTime,
@@ -37,14 +50,14 @@ pub struct Seen {
 #[derive(Insertable)]
 #[table_name = "silence"]
 pub struct DbSilence {
-    pub command: String,
-    pub channel: String
+    pub channel: String,
+    pub command: String
 }
 #[derive(Queryable)]
 pub struct Silence {
     _id: i32,
-    pub command: String,
-    pub channel: String
+    pub channel: String,
+    pub command: String
 }
 
 #[derive(Insertable, Queryable)]

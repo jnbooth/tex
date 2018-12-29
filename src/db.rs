@@ -143,34 +143,38 @@ impl Db {
         Ok(removed.is_some())
     }
 
-    pub fn add_seen(&mut self, nick_up: &str, message: &str) -> QueryResult<()> {
+    pub fn add_seen(&mut self, channel_up: &str, nick_up: &str, message: &str) -> QueryResult<()> {
         use super::schema::seen;
+        let channel = channel_up.to_lowercase();
         let nick = nick_up.to_lowercase();
-        let when = SystemTime::now();
-        let seen = Seen { 
-            nick, 
-            first:  message.to_owned(), first_time:  when, 
-            latest: message.to_owned(), latest_time: when,
-            total:  1 
-        };
-        diesel::insert_into(seen::table)
-            .values(&seen)
-            .on_conflict(seen::nick)
-            .do_update()
-            .set((
-                seen::latest.eq(message),
-                seen::latest_time.eq(when),
-                seen::total.eq(seen::total + 1)
-            ))
-            .execute(&self.conn)?;
+        if channel != nick && channel != self.nick {
+            let when = SystemTime::now();
+            let seen = DbSeen { 
+                channel,
+                nick,
+                first:   message.to_owned(), first_time:  when, 
+                latest:  message.to_owned(), latest_time: when,
+                total:   1 
+            };
+            diesel::insert_into(seen::table)
+                .values(&seen)
+                .on_conflict((seen::channel, seen::nick))
+                .do_update()
+                .set((
+                    seen::latest.eq(message),
+                    seen::latest_time.eq(when),
+                    seen::total.eq(seen::total + 1)
+                ))
+                .execute(&self.conn)?;
+        }
         Ok(())
     }
 
-    pub fn get_seen(&self, nick_up: &str) -> Option<Seen> {
+    pub fn get_seen(&self, channel_up: &str, nick_up: &str) -> Option<Seen> {
         use super::schema::seen;
-        let nick = nick_up.to_lowercase();
         seen::table
-            .filter(seen::nick.eq(nick))
+            .filter(seen::channel.eq(channel_up.to_lowercase()))
+            .filter(seen::nick.eq(nick_up.to_lowercase()))
             .limit(1)
             .load(&self.conn)
             .expect("Error loading seen messages")

@@ -34,7 +34,9 @@ table! {
 }
 
 table! {
-    seen (nick) {
+    seen (id) {
+        id -> Int4,
+        channel -> Varchar,
         nick -> Varchar,
         first -> Varchar,
         first_time -> Timestamp,
@@ -47,8 +49,8 @@ table! {
 table! {
     silence (id) {
         id -> Int4,
-        command -> Varchar,
         channel -> Varchar,
+        command -> Varchar,
     }
 }
 

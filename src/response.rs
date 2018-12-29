@@ -254,7 +254,7 @@ pub fn respond<T: Responder>(
 
         if mode == Mode::Invalid {
             wrong()
-        } else if let Some(result) = seen::search(db, source, mode) {
+        } else if let Some(result) = seen::search(db, target, source, mode) {
             reply(&result)
         } else {
             reply(NO_RESULTS)
