@@ -19,13 +19,14 @@ mod wikipedia;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
-const ABBREVIATE: [&str; 8] =
+const ABBREVIATE: [&str; 9] =
         [ "choose"
         , "define"
         , "google"
         , "remindme"
         , "seen"
         , "select"
+        , "tell"
         , "wikipedia"
         , "zyn"
         ];
@@ -272,6 +273,15 @@ pub fn respond<T: Responder>(
         }
     },
 
+    "tell" => {
+        if len < 2 {
+            wrong()
+        } else {
+            db::log(db.add_tell(source, &args[0], &args[1..].join(" ")));
+            client.action(target, &format!("writes down {}'s message and nods.", source))
+        }
+    },
+
     "wikipedia" => {
         if len == 0 {
             wrong()
@@ -320,11 +330,13 @@ fn usage(command: &str) -> String {
     } else if command == "roll" {
         "Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF], [roll 2d6>3 + 10].".to_string()
     } else if "seen".starts_with(&command) {
-        args("[-f|-t] name")
+        args("[-f|-t] user")
     } else if "select".starts_with(&command) {
         args("number")
     } else if "remindme".starts_with(&command) {
         format!("Usage: {} [<days>d][<hours>h][<minutes>m] message. Example: [{} 4h30m Fix my voice filter.]", command, command)
+    } else if "tell".starts_with(&command) {
+        args("user message")
     } else if "wikipedia".starts_with(&command) {
         args("article")
     } else if "zyn".starts_with(&command) {

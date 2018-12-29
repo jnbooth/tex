@@ -4,7 +4,7 @@ use rand::rngs::ThreadRng;
 use super::super::IO;
 
 pub fn throw(s: &str) -> IO<String> {
-    let mut throw = s.to_owned();
+    let mut throw = s.replace("-", "- ").replace("+", "+ ").replace("  ", " ");
     if !throw.starts_with('+') && !throw.starts_with('-') {
         throw = format!("+ {}", throw);
     }

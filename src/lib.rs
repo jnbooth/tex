@@ -16,6 +16,7 @@ use irc::client::prelude::*;
 use irc::error::IrcError;
 use percent_encoding::utf8_percent_encode;
 use std::iter::*;
+use std::time::{Duration, SystemTime};
 
 mod color;
 mod db;
@@ -70,6 +71,13 @@ fn encode(s: &str) -> String {
     utf8_percent_encode(s, percent_encoding::DEFAULT_ENCODE_SET).to_string()
 }
 
+fn show_time(when: SystemTime) -> String {
+    let time = humantime::format_rfc3339_seconds(
+        when - Duration::from_secs(60 * 60 * 8)
+    ).to_string();
+    time[..time.len()-4].rsplit("T").collect::<Vec<&str>>().join(" ").replace("-", "/")
+}
+
 fn get_config() -> Config {
     Config {
         server:   Some(from_env("IRC_SERVER")),
@@ -86,17 +94,23 @@ fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<()
     match (m_prefix, m_target, message.command.to_owned()) {
         (Some(prefix), Some(target), Command::PRIVMSG(_, msg)) => {
             if let Some(source) = prefix.split("!").next() {
+                if let Some(reminders) = db.get_reminders(source) {
+                    for x in reminders {
+                        client.privmsg(source, &format!("Reminder: {}", x.message))?
+                    }
+                }
+                if let Some(tells) = db.get_tells(source) {
+                    for x in tells {
+                        client.privmsg(source, 
+                            &format!("From {} at {}: {}", x.sender, show_time(x.time), x.message)
+                        )?
+                    }
+                }
                 let commands = get_commands(&msg);
                 if commands.is_empty() {
                     print!("{}", message);
                 } else {
                     log_part(color::ASK, &message.to_string());
-                    if let Some(reminders) = db.get_reminders(source) {
-                        for x in reminders {
-                            client.privmsg(source, &format!("Reminder: {}", x.message))?
-                      
-                        }
-                    } 
                     for command in commands {
                         response::respond(db, client, source, target, command)?
                     }

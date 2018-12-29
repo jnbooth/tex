@@ -69,6 +69,7 @@ pub struct Db {
     properties:  HashMap<String, String>,
     reminders:   MultiMap<String, Reminder>,
     silences:    MultiMap<String, String>,
+    tells:       MultiMap<String, Tell>,
     users:       HashMap<String, User>,
     pub api:     Apis
 }
@@ -84,6 +85,7 @@ impl Db {
             properties: load_properties(&conn),
             reminders:  load_reminders(&conn),
             silences:   load_silences(&conn),
+            tells:      load_tells(&conn),
             users:      load_users(&conn),
             api:        Apis::new(),
             conn
@@ -149,12 +151,12 @@ impl Db {
         let nick = nick_up.to_lowercase();
         if channel != nick && channel != self.nick {
             let when = SystemTime::now();
-            let seen = DbSeen { 
+            let seen = Seen { 
                 channel,
                 nick,
-                first:   message.to_owned(), first_time:  when, 
-                latest:  message.to_owned(), latest_time: when,
-                total:   1 
+                first:  message.to_owned(), first_time:  when, 
+                latest: message.to_owned(), latest_time: when,
+                total:  1 
             };
             diesel::insert_into(seen::table)
                 .values(&seen)
@@ -164,8 +166,7 @@ impl Db {
                     seen::latest.eq(message),
                     seen::latest_time.eq(when),
                     seen::total.eq(seen::total + 1)
-                ))
-                .execute(&self.conn)?;
+                )).execute(&self.conn)?;
         }
         Ok(())
     }
@@ -176,32 +177,63 @@ impl Db {
             .filter(seen::channel.eq(channel_up.to_lowercase()))
             .filter(seen::nick.eq(nick_up.to_lowercase()))
             .limit(1)
-            .load(&self.conn)
+            .load::<DbSeen>(&self.conn)
             .expect("Error loading seen messages")
             .pop()
+            .map(From::from)
     }
-
+    
     pub fn add_reminder(&mut self, nick_up: &str, when: SystemTime, message: &str) 
     -> QueryResult<()> {
+        let nick = nick_up.to_lowercase();
         use super::schema::reminder;
-        let reminder = DbReminder {
-            nick:    nick_up.to_lowercase(),
+        let reminder = Reminder {
+            nick:    nick.to_owned(),
             when:    when,
             message: message.to_owned()
         };
         diesel::insert_into(reminder::table)
             .values(&reminder)
             .execute(&self.conn)?;
+        self.reminders.insert(nick, reminder);
         Ok(())
     }
     pub fn get_reminders(&mut self, nick_up: &str) -> Option<Vec<Reminder>> {
         use super::schema::reminder;
+        let nick = nick_up.to_lowercase();
         let when = SystemTime::now();
         let mut reminders = self.reminders.get_vec_mut(&nick_up.to_lowercase())?;
         let expired = drain_filter(&mut reminders, |x| x.when < when);
-        diesel::delete(reminder::table.filter(reminder::when.lt(when)))
-            .execute(&self.conn).ok();
+        diesel::delete(reminder::table
+                .filter(reminder::nick.eq(nick))
+                .filter(reminder::when.lt(when))
+            ).execute(&self.conn).ok();
         Some(expired)
+    }
+
+    pub fn add_tell(&mut self, sender: &str, target_up: &str, message: &str) -> QueryResult<()> {
+        use super::schema::tell;
+        let target = target_up.to_lowercase();
+        let tell = Tell {
+            sender:  sender.to_owned(),
+            target:  target.to_owned(),
+            time:    SystemTime::now(),
+            message: message.to_owned()
+        };
+        diesel::insert_into(tell::table)
+            .values(&tell)
+            .execute(&self.conn)?;
+        self.tells.insert(target, tell);
+        Ok(())
+    }
+
+    pub fn get_tells(&mut self, nick_up: &str) -> Option<Vec<Tell>> {
+        use super::schema::tell;
+        let nick = nick_up.to_lowercase();
+        let tells = self.tells.remove(&nick)?;
+        diesel::delete(tell::table.filter(tell::target.eq(nick)))
+            .execute(&self.conn).ok();
+        Some(tells)
     }
 
     pub fn silenced(&self, channel: &str, command: &str) -> bool {
@@ -222,7 +254,7 @@ impl Db {
         } else {
             self.silences.insert(channel.to_owned(), command.to_owned());
             diesel::insert_into(silence::table)
-                .values(DbSilence { channel: channel.to_owned(), command: command.to_owned() })
+                .values(Silence { channel: channel.to_owned(), command: command.to_owned() })
                 .execute(&self.conn)?;
         }
         Ok(())
@@ -251,7 +283,17 @@ fn load_reminders(conn: &PgConnection) -> MultiMap<String, Reminder> {
         reminder::table.load(conn)
             .expect("Error loading reminders")
             .into_iter()
-            .map(|x: Reminder| (x.nick.to_owned(), x))
+            .map(|x: DbReminder| (x.nick.to_owned(), Reminder::from(x)))
+    )
+}
+
+fn load_tells(conn: &PgConnection) -> MultiMap<String, Tell> {
+    use super::schema::tell;
+    MultiMap::from_iter(
+        tell::table.load(conn)
+            .expect("Error loading tells")
+            .into_iter()
+            .map(|x: DbTell| (x.target.to_owned(), Tell::from(x)))
     )
 }
 
@@ -261,7 +303,7 @@ fn load_silences(conn: &PgConnection) -> MultiMap<String, String> {
         silence::table.load(conn)
             .expect("Error loading reminders")
             .into_iter()
-            .map(|x: Silence| (x.channel, x.command))
+            .map(|x: DbSilence| (x.channel, x.command))
     )
 }
 

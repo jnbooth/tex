@@ -86,6 +86,12 @@ __Usage:__ `select number`
 
 Select one of several options given by the bot, such as when it retrieves a Wikipedia disambiguation page.
 
+#### [tell], [t]
+
+__Usage:__ `tell user message`
+
+Send a message to another user. The bot will privately send the message to the user when it next sees a message from them.
+
 #### [wikipedia], [wiki], [w]
 
 __Usage:__ `wiki article`
