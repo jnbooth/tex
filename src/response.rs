@@ -232,8 +232,8 @@ pub fn respond<T: Responder>(
     "roll" => {
         if len == 0 {
             wrong()
-        } else if let Ok(throw) = roll::throw(&content) {
-            reply(&format!("{} (rolled {})", throw, content))
+        } else if let Ok(result) = roll::throw(&content) {
+            reply(&result)
         } else {
             reply("Invalid roll.")
         }
@@ -328,7 +328,7 @@ fn usage(command: &str) -> String {
     } else if command == "reload" {
         noargs
     } else if command == "roll" {
-        "Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF], [roll 2d6>3 + 10].".to_string()
+        "Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF-2], [roll 2d6>3 - 1d4].".to_string()
     } else if "seen".starts_with(&command) {
         args("[-f|-t] user")
     } else if "select".starts_with(&command) {
