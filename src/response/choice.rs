@@ -1,11 +1,13 @@
+use crate::IO;
 use super::NO_RESULTS;
-use super::super::IO;
 
+const NOT_FOUND: &str = "That isn't one of my choices.";
 const CHARACTER_LIMIT: usize = 429;
 
 pub struct Choices(Vec<Box<Fn() -> IO<String>>>);
+
 impl Choices {
-    pub fn new() -> Choices {
+    pub fn new() -> Self {
         Choices(Vec::new())
     }
 
@@ -18,14 +20,14 @@ impl Choices {
     }
 
     pub fn run_choice(&mut self, i: usize) -> IO<String> {
-        match self.0.get(i - 1) {
+        match self.0.get(i) {
             Some(choice) => (choice)(),
-            None => Ok("That isn't one of my choices.".to_string())
+            None => Ok(NOT_FOUND.to_owned())
         }
     }
 }
 
-pub fn suggest(suggestions: &Vec<String>) -> String {
+pub fn suggest(suggestions: &[String]) -> String {
     if suggestions.is_empty() {
         NO_RESULTS.to_owned()
     } else {
@@ -45,5 +47,37 @@ pub fn suggest(suggestions: &Vec<String>) -> String {
             s.push_str(suggest);
         }
         s.to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_run_choice() {
+        let mut x = Choices::new();
+        x.add(|| Ok("success!".to_owned()));
+        assert_eq!(x.run_choice(0).unwrap(), "success!".to_owned());
+    }
+
+    #[test]
+    fn test_empty() {
+        assert_eq!(Choices::new().run_choice(0).unwrap(), NOT_FOUND.to_owned());
+    }
+
+    #[test]
+    fn test_outsize() {
+        let mut x = Choices::new();
+        x.add(|| panic!("Wrong choice picked!"));
+        assert_eq!(x.run_choice(1).unwrap(), NOT_FOUND.to_owned());
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut x = Choices::new();
+        x.add(|| panic!("Wrong choice picked!"));
+        x.clear();
+        assert_eq!(x.run_choice(0).unwrap(), NOT_FOUND.to_owned());
     }
 }

@@ -1,10 +1,24 @@
 table! {
-    ban (id) {
-        id -> Int4,
-        nicks -> Varchar,
-        ips -> Varchar,
-        reason -> Varchar,
-        expiry -> Date,
+    name_female (name) {
+        name -> Varchar,
+        frequency -> Int4,
+        probability -> Float8,
+    }
+}
+
+table! {
+    name_last (name) {
+        name -> Varchar,
+        frequency -> Int4,
+        probability -> Float8,
+    }
+}
+
+table! {
+    name_male (name) {
+        name -> Varchar,
+        frequency -> Int4,
+        probability -> Float8,
     }
 }
 
@@ -14,13 +28,6 @@ table! {
         name -> Varchar,
         author -> Varchar,
         votes -> Int4,
-    }
-}
-
-table! {
-    property (key) {
-        key -> Varchar,
-        value -> Varchar,
     }
 }
 
@@ -73,9 +80,10 @@ table! {
 }
 
 allow_tables_to_appear_in_same_query!(
-    ban,
+    name_female,
+    name_last,
+    name_male,
     page,
-    property,
     reminder,
     seen,
     silence,

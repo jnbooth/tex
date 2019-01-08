@@ -1,16 +1,6 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 use std::time::SystemTime;
-use super::schema::*;
-
-#[macro_use]
-mod model_macro;
-
-#[derive(Insertable, Queryable)]
-#[table_name = "property"]
-pub struct Property {
-    pub key:   String,
-    pub value: String
-}
+use crate::db::schema::*;
 
 model!(Reminder; DbReminder; "reminder"; {
     nick:    String,
@@ -40,10 +30,22 @@ model!(Tell; DbTell; "tell"; {
     message: String
 });
 
-#[derive(Insertable, Queryable)]
 #[table_name = "user"]
+#[derive(Queryable, Insertable)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct User {
     pub nick:     String,
     pub auth:     i32,
     pub pronouns: Option<String>
+}
+
+#[table_name = "name_male"]
+#[table_name = "name_female"]
+#[table_name = "name_last"]
+#[derive(Insertable, Queryable)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct Name {
+    pub name:        String,
+    pub frequency:   i32,
+    pub probability: f64
 }

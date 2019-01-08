@@ -1,49 +1,33 @@
 #[macro_use] extern crate diesel;
-extern crate dotenv;
-extern crate failure;
-extern crate humantime;
-#[macro_use] extern crate lazy_static;
-extern crate percent_encoding;
-extern crate regex;
-extern crate reqwest;
-extern crate select;
-extern crate serde;
-extern crate serde_json;
-extern crate xmlrpc;
 
-use dotenv::dotenv;
 use irc::client::prelude::*;
 use irc::error::IrcError;
-use percent_encoding::utf8_percent_encode;
+use irc::proto::Command::*;
 use std::iter::*;
-use std::time::{Duration, SystemTime};
 
 mod color;
 mod db;
-mod models;
+mod env;
 mod responder;
 mod response;
-mod schema;
-mod wikidot;
-mod vec;
+#[macro_use] mod util;
 
-use self::color::log_part;
-use self::db::Db;
-use self::responder::Responder;
+use crate::color::log_part;
+use crate::db::Db;
+use crate::responder::Responder;
 
 type IO<T> = Result<T, failure::Error>;
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Api {
     user: String,
-    key: String
+    key:  String
 }
 
 pub fn run() -> Result<(), IrcError> {
-    dotenv().ok();
     let mut db = Db::new();
-    let config = get_config();
     let mut reactor = IrcReactor::new()?;
-    let client = reactor.prepare_client_and_connect(&config)?;
+    let client = reactor.prepare_client_and_connect(&env::irc())?;
     client.identify()?;
 
     reactor.register_client_with_handler(client, move |c, m| handler(&mut db, c, m));
@@ -52,75 +36,57 @@ pub fn run() -> Result<(), IrcError> {
     Ok(())
 }
 
-fn from_env(var: &str) -> String {
-    std::env::var(var).expect(&format!("{} must be set in ./.env", var))
+fn parse_msg(message: Message) -> Option<(String, String, String)> {
+    let target = message.response_target()?.to_owned();
+    let prefix = message.prefix?.to_owned();
+    Some((
+        target, 
+        prefix.split('!').next()?.to_owned(),
+        prefix.split('@').last()?.to_owned()
+    ))
 }
-
-fn from_env_opt(var: &str) -> Option<String> {
-    let res = std::env::var(var).ok()?.trim().to_owned();
-    if res.is_empty() { None } else { Some(res) }
-}
-
-fn from_env_api(prefix: &str, user: &str, key: &str) -> Option<Api> {
-    Some(Api { 
-        user: from_env_opt(&format!("{}_{}", prefix, user))?, 
-        key:  from_env_opt(&format!("{}_{}", prefix, key))? 
-    })
-}
-
-fn encode(s: &str) -> String {
-    utf8_percent_encode(s, percent_encoding::DEFAULT_ENCODE_SET).to_string()
-}
-
-fn show_time(when: SystemTime) -> String {
-    let time = humantime::format_rfc3339_seconds(
-        when - Duration::from_secs(60 * 60 * 8)
-    ).to_string();
-    time[..time.len()-4].rsplit("T").collect::<Vec<&str>>().join(" ").replace("-", "/")
-}
-
-fn get_config() -> Config {
-    Config {
-        server:   Some(from_env("IRC_SERVER")),
-        nickname: Some(from_env("IRC_NICK")),
-        password: Some(from_env("IRC_PASSWORD")),
-        channels: Some(from_env("AUTOJOIN").split(",").map(|x| format!("#{}", x)).collect()),
-        ..Config::default()
-    }
-}
-
 fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<(), IrcError> {
-    let m_prefix = message.prefix.to_owned();
-    let m_target = message.response_target().to_owned();
-    match (m_prefix, m_target, message.command.to_owned()) {
-        (Some(prefix), Some(target), Command::PRIVMSG(_, msg)) => {
-            if let Some(source) = prefix.split("!").next() {
-                if let Some(reminders) = db.get_reminders(source) {
-                    for x in reminders {
-                        client.privmsg(source, &format!("Reminder: {}", x.message))?
+    let text = message.to_string();
+    match parse_msg(message.clone()) {
+        None => print!("{}", text),
+        Some((target, source, host)) => {
+            match message.command {
+                JOIN(_, _, _) => {
+                    match &db.bans {
+                        None       => print!("{}", text),
+                        Some(bans) => match bans.get_ban(&target, &source, &host) {
+                            None         => print!("{}", text),
+                            Some(reason) => {
+                                log_part(color::WARN, &text);
+                                client.ban(&target, &source, &reason)?;
+                            }
+                        }
                     }
-                }
-                if let Some(tells) = db.get_tells(source) {
-                    for x in tells {
-                        client.privmsg(source, 
-                            &format!("From {} at {}: {}", x.sender, show_time(x.time), x.message)
-                        )?
+                },
+                PRIVMSG(_, msg) => {
+                    for reminder in db.get_reminders(&source).into_iter().flatten() {
+                        client.privmsg(&source, &format!("Reminder: {}", reminder.message))?;
                     }
-                }
-                let commands = get_commands(&msg);
-                if commands.is_empty() {
-                    print!("{}", message);
-                } else {
-                    log_part(color::ASK, &message.to_string());
-                    for command in commands {
-                        response::respond(db, client, source, target, command)?
+                    for tell in db.get_tells(&source).into_iter().flatten() {
+                        client.privmsg(&source, &format!(
+                            "From {} at {}: {}", tell.sender, util::show_time(tell.time), tell.message
+                        ))?;
                     }
-                }
-            db::log(db.add_seen(&target, &source, &msg))
+                    let commands = get_commands(&msg);
+                    if commands.is_empty() {
+                        print!("{}", text);
+                    } else {
+                        log_part(color::ASK, &text);
+                        for command in commands {
+                            response::respond(db, client, &source, &target, command)?
+                        }
+                    }
+                    db::log(db.add_seen(&target, &source, &msg));
+                },
+                _ => print!("{}", text)
             }
-        },
-        _ => print!("{}", message)
-    };
+        }
+    }
     Ok(())
 }
 
@@ -132,7 +98,7 @@ fn get_commands(message: &str) -> Vec<&str> {
             .split('[')
             .skip(1)
             .filter_map(|x| x.find(']').and_then(|i| {
-                let cmd = x.split_at(i).0.trim();
+                let cmd = x[..i].trim();
                 if cmd.is_empty() { None } else { Some(cmd) }
             }))
             .collect()

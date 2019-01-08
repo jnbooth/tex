@@ -62,6 +62,12 @@ __Usage:__ `hug`
 
 Hug the bot!
 
+#### [name]
+
+__Usage:__ `name [-f|-m]`
+
+Randomly generates a name. With no flags, gender is random. `-f` generates a female name. `-m` generates a male name.
+
 #### [remindme], [remind], [r]
 
 __Usage:__ `remindme [<days>d][<hours>h][<minutes>m]`
@@ -78,11 +84,11 @@ Randomly roll some dice. Basic dice notation follows the format of `<# of dice>d
 
 __Usage:__ `seen [-f|-t] nick [#channel]`
 
-With no flags, display the most recent message seen from a user and how long ago it occurred. With `-f`, display the first message seen from a user and how long ago it occurred. With `-t`, display the total number of messages seen from a user. Note: `/me` emotes are ignored. If a channel is not given, the current channel is used.
+With no flags, display the most recent message seen from a user and how long ago it occurred. `-f` displays the first message seen from a user and how long ago it occurred. `-t` displays the total number of messages seen from a user. If a channel is not given, the current channel is used. Note: `/me` emotes are ignored.
 
-#### [select], [sel]
+#### [showmore], [sm]
 
-__Usage:__ `select number`
+__Usage:__ `sm number`
 
 Select one of several options given by the bot, such as when it retrieves a Wikipedia disambiguation page.
 

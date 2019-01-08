@@ -1,6 +1,5 @@
-use std::time::{Duration, SystemTime, SystemTimeError};
-use super::super::db::Db;
-use super::super::vec::pop_filter;
+use crate::db::Db;
+use crate::util;
 
 pub enum Error {
     InvalidArgs,
@@ -24,13 +23,13 @@ pub fn mode(s: &str) -> Option<Mode> {
     }
 }
 
-pub fn search(db: &Db, target: &str, args_im: &Vec<&str>) -> Result<String, Error> {
-    let mut args = args_im.clone();
-    let mode = match pop_filter(&mut args, |x| x.starts_with("-")) {
+pub fn search(db: &Db, target: &str, args_im: &[&str]) -> Result<String, Error> {
+    let mut args = args_im.to_owned();
+    let mode = match util::pop_filter(&mut args, |x| x.starts_with("-")) {
         None       => Mode::Regular,
         Some(flag) => mode(flag).ok_or(Error::InvalidArgs)?
     };
-    let channel = pop_filter(&mut args, |x| x.starts_with("#"))
+    let channel = util::pop_filter(&mut args, |x| x.starts_with("#"))
         .unwrap_or(target);
     match args.as_slice() {
         [nick] => find(db, channel, nick, mode).ok_or(Error::NotFound),
@@ -38,27 +37,99 @@ pub fn search(db: &Db, target: &str, args_im: &Vec<&str>) -> Result<String, Erro
     }
 }
 
-fn since(when: SystemTime) -> Result<String, SystemTimeError> {
-    let dur = when.elapsed()?.as_secs();
-    Ok(humantime::format_duration(
-        Duration::from_secs(if dur < 60 { dur } else { dur / 60 * 60 })
-    ).to_string())
-}
-
 fn find(db: &Db, channel: &str, nick: &str, mode: Mode) -> Option<String> {
-    let seen = db.get_seen(channel, nick)?;
+    let seen = db.get_seen(channel, nick).ok()??;
     match mode {
         Mode::First => Some(format!(
             "I first saw {} {} ago, saying: {}", 
-            nick, since(seen.first_time).ok()?, seen.first
+            nick, util::since(seen.first_time).ok()?, seen.first
         )),
         Mode::Regular => Some(format!(
             "I last saw {} {} ago, saying: {}",
-            nick, since(seen.latest_time).ok()?, seen.latest
+            nick, util::since(seen.latest_time).ok()?, seen.latest
         )),
         Mode::Total => Some(format!(
             "I have seen {} total message{} from {}.",
             seen.total, if seen.total != 1 { "s" } else { "" }, nick
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const USER: &str = "@";
+    const CHAN: &str = "#@";
+
+    fn db_test() -> Db {
+        let mut db = Db::new();
+        db.add_seen(CHAN, USER, "first").expect("Error adding first");
+        db.add_seen(CHAN, USER, "latest").expect("Error adding last");
+        db
+    }
+
+    fn clear(db: &mut Db) {
+        db.delete_user(USER).expect("Error deleting test user");
+    }
+
+    #[test]
+    fn test_first() {
+        let mut db = db_test();
+        let res = search(&db, CHAN, &["-f", USER]);
+        clear(&mut db);
+        assert_eq!(
+            res.ok().unwrap(), 
+            format!("I first saw {} 0s ago, saying: first", USER)
+        );
+    }
+
+    #[test]
+    fn test_latest() {
+        let mut db = db_test();
+        let res = search(&db, CHAN, &[USER]);
+        clear(&mut db);
+
+        assert_eq!(
+            res.ok().unwrap(), 
+            format!("I last saw {} 0s ago, saying: latest", USER)
+        );
+    }
+
+    #[test]
+    fn test_total() {
+        let mut db = db_test();
+        let res = search(&db, CHAN, &["-t", USER]);
+        clear(&mut db);
+
+        assert_eq!(
+            res.ok().unwrap(), 
+            format!("I have seen 2 total messages from {}.", USER)
+        );
+    }
+
+    #[test]
+    fn test_compound() {
+        let mut db = db_test();
+        let res = search(&db, "#!", &[USER, "-t", CHAN]);
+        clear(&mut db);
+
+        assert_eq!(
+            res.ok().unwrap(), 
+            format!("I have seen 2 total messages from {}.", USER)
+        );
+    }
+
+
+    #[test]
+    fn test_privmsg_is_none() {
+        let mut db = Db::new();
+        db.add_seen(USER, USER, "!").ok().unwrap();
+        assert!(search(&db, USER, &[USER]).is_err());
+    }
+
+    #[test]
+    fn test_unseen_is_none() {
+        assert!(search(&Db::new(), CHAN, &[USER]).is_err());
     }
 }

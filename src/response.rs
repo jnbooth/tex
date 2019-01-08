@@ -1,13 +1,12 @@
 use irc::error::IrcError;
-use std::borrow::ToOwned;
 use std::time::SystemTime;
 use rand::Rng;
 
-use super::db;
-use super::db::Db;
-use super::color;
-use super::color::log;
-use super::responder::Responder;
+use crate::{color, db, util};
+use crate::util::Gender;
+use crate::db::Db;
+use crate::color::log;
+use crate::responder::Responder;
 
 pub mod choice;
 mod dictionary;
@@ -15,29 +14,35 @@ mod google;
 mod reminder;
 mod roll;
 mod seen;
+pub mod wikidot;
 mod wikipedia;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
-const ABBREVIATE: [&str; 9] =
+const ABBREVIATE: [&str; 8] =
         [ "choose"
         , "define"
         , "google"
         , "remindme"
         , "seen"
-        , "select"
         , "tell"
         , "wikipedia"
         , "zyn"
         ];
 
 fn abbreviate(command: &str) -> &str {
-    for abbr in ABBREVIATE.into_iter() {
-        if abbr.starts_with(command) {
-            return abbr
+    match command {
+        "lc" => "lastcreated",
+        "sm" => "showmore",
+        _    => {
+            for abbr in ABBREVIATE.into_iter() {
+                if abbr.starts_with(command) {
+                    return abbr
+                }
+            }
+            command
         }
     }
-    command
 }
 
 pub fn respond<T: Responder>(
@@ -47,42 +52,36 @@ pub fn respond<T: Responder>(
     target: &str, 
     message: &str
 ) -> Result<(), IrcError> {
-    let (command_base, content) = match message.find(' ') {
-        None    => (message.to_lowercase(), "".to_owned()),
-        Some(i) => {
-            let (command, content) = message.split_at(i);
-            (command.to_lowercase(), content[1..].to_owned())
-        }
-    };
-
-    let command = abbreviate(&command_base);
-
-    if db.silenced(target, command) {
-        return warn(&format!("{} attempted to use a silenced command: {}!", target, command))
-    }
-
-    let args: Vec<&str> = content
-        .split(' ')
-        //.map(ToOwned::to_owned)
-        .filter(|x| !x.is_empty())
-        .collect();
-    let len = args.len();
+    let (command_base, content) = util::split_on(" ", message).unwrap_or((message, ""));;
     
     let reply  = |msg: &str| client.reply(target, source, msg);
-    let wrong  = || reply(&usage(&command_base));
-    let unauth = || warn(
-        &format!("{} attempted to use an unauthorized command: {}!", source, command)
-    );
+    let wrong  = || match usage(&command_base) {
+        None    => Ok(()),
+        Some(s) => reply(&s)
+    };
+    let unauth = || {
+        warn(&db, &format!("{} used an unauthorized command: {}", source, command_base)); 
+        Ok(()) 
+    };
+    let try_reply = |msg: Result<String, _>| match msg {
+        Err(_) => reply(NO_RESULTS),
+        Ok(s)  => reply(&s)
+    };
 
-    match command {
+    // Waiting for https://github.com/rust-lang/rust/issues/23121
+    match (
+        abbreviate(&command_base), 
+        content.split(' ').filter(|x| !x.is_empty()).collect::<Vec<&str>>().as_slice()
+    ) {
+    (command, _) if db.silenced(target, command) => {
+        warn(&db, &format!("{} attempted to use a silenced command: {}!", target, command));
+        Ok(())
+    }
 
-    "auth" => {
+    ("auth", [auth_s, nick]) => {
         if !db.auth(3, source) {
             unauth()
-        } else if len != 2 {
-            wrong()
-        } else if let Ok(auth) = args[0].parse() {
-            let nick = args[1].to_owned();
+        } else if let Ok(auth) = auth_s.parse() {
             if !db.outranks(source, &nick) {
                 unauth()
             } else {
@@ -94,133 +93,110 @@ pub fn respond<T: Responder>(
         }
     },
 
-    "choose" => {
+    ("choose", []) => wrong(),
+    ("choose", _)  => {
         let opts: Vec<&str> = content.split(',').map(str::trim).collect();
         reply(
             opts[ rand::thread_rng().gen_range(0, opts.len()) ]
         )
     },
 
-    "define" => {
-        if len == 0 {
-            wrong()
-        } else if let Ok(result) = dictionary::search(&db.client, &content) {
-            reply(&result)
-        } else {
-            reply(NO_RESULTS)
-        }
-    },
+    ("define", []) => wrong(),
+    ("define", _)  => 
+        try_reply(dictionary::search(&db.client, &content)),
     
-    "disable" => {
+    ("disable", [cmd]) => {
         if !db.auth(2, source) {
             unauth()
-        } else if len != 1 {
-            wrong()
         } else {
-            let disable = abbreviate(&content);
+            let disable = abbreviate(&cmd);
             db::log(db.set_enabled(target, disable, false));
             reply(&format!("[{}] disabled.", disable))
         }
     },
 
-    "enable" => {
+    ("enable", [cmd]) => {
         if !db.auth(2, source) {
             unauth()
-        } else if len != 1 {
-            wrong()
         } else {
-            let enable = abbreviate(&content);
+            let enable = abbreviate(&cmd);
             db::log(db.set_enabled(target, enable, true));
             reply(&format!("[{}] enabled.", enable))
         }
     },
     
-    "forget" => {
+    ("forget", [nick]) => {
         if !db.auth(3, source) || !db.outranks(source, &content) {
             unauth()
-        } else if len != 1 {
-            wrong()
         } else { 
-            match db.delete_user(&content) {
-                Err(e)    => warn(&format!("DB error: {}", e)),
-                Ok(true)  => reply(&format!("Forgot {}.", content)),
-                Ok(false) => reply(&format!("I don't know {}.", content)),
-            }
+            reply(&match db.delete_user(&nick) {
+                Err(e)    => warn(&db, &format!("Error deleting user {}: {}", nick, e)),
+                Ok(true)  => format!("Forgot {}.", nick),
+                Ok(false) => format!("I don't know {}.", nick),
+            })
         }
     },
 
-    "gis" => {
+    ("gis", []) => wrong(),
+    ("gis", _)  => {
         match &db.api.google {
             None      => Ok(()),
-            Some(api) => {
-                if len == 0 {
-                    wrong()
-                } else if let Ok(result) = google::search_image(&api, &db.client, &content) {
-                    reply(&result)
-                } else {
-                    reply(NO_RESULTS)
-                }
-            }
+            Some(api) => try_reply(google::search_image(&api, &db.client, &content))
         }
     },
 
-    "google" => {
+    ("google", []) => wrong(),
+    ("google", _)  => {
         match &db.api.google {
             None      => Ok(()),
-            Some(api) => {
-                if len == 0 {
-                    wrong()
-                } else if let Ok(result) = google::search(&api, &db.client, &content) {
-                    reply(&result)
-                } else {
-                    reply(NO_RESULTS)
-                }
+            Some(api) => try_reply(google::search(&api, &db.client, &content))
+        }
+    },
+
+    ("help", [cmd]) => match usage(&cmd) {
+        None    => reply("I'm sorry, I don't know that command."),
+        Some(s) => reply(&s)
+    },
+
+    ("hug", []) => 
+        client.action(target, &format!("hugs {}.", source)),
+
+    ("lastcreated", []) => {
+        match &db.api.wikidot {
+            None => Ok(()),
+            Some(wikidot) => match wikidot.last_created(&db.client) {
+                Err(e)    => reply(&warn(&db, &format!(".lc error: {}", e))),
+                Ok(pages) => { for page in pages { reply(&page)? } Ok(()) }
             }
         }
-    },
+    }
 
-    "help" => {
-        if len != 1 {
-            wrong()
-        } else {
-            reply(&usage(&content))
-        }
-    },
+    ("name", [])     => reply(&db.names.gen(Gender::Any)),
+    ("name", ["-f"]) => reply(&db.names.gen(Gender::Female)),
+    ("name", ["-m"]) => reply(&db.names.gen(Gender::Male)),
 
-    "hug" => {
-        if len != 0 {
-            wrong()
-        } else {
-            client.action(target, &format!("hugs {}.", source))
-        }
-    },
-
-    "quit" => {
+    ("quit", []) => {
         if !db.auth(3, source) {
             unauth()
-        } else if len != 0 {
-            wrong()
         } else {
             client.quit("Shutting down, bleep bloop.")
         }
     }, 
 
-    "reload" => {
+    ("reload", []) => {
         if !db.auth(4, source) {
             unauth()
-        } else if len != 0 {
-            wrong()
         } else {
             log(color::DEBUG, "Reloading properties.");
-            db.reload();
-            reply("Properties reloaded.")
+            match db.reload() {
+                Err(e) => reply(&warn(&db, &format!("Error reloading database: {}", e))),
+                Ok(()) => reply("Properties reloaded.")
+            }
         }
     },
 
-    "remindme" => {
-        if len < 2 {
-            wrong()
-        } else if let Some(offset) = reminder::parse_offset(&args[0]) {
+    ("remindme", args) if args.len() >= 2 => {
+        if let Some(offset) = reminder::parse_offset(&args[0]) {
             let when = SystemTime::now() + offset;
             db::log(db.add_reminder(source, when, &args[1..].join(" ")));
             reply("Reminder added.")
@@ -229,17 +205,16 @@ pub fn respond<T: Responder>(
         }
     },
 
-    "roll" => {
-        if len == 0 {
-            wrong()
-        } else if let Ok(result) = roll::throw(&content) {
-            reply(&result)
+    ("roll", []) => wrong(),
+    ("roll", _)  => {
+        if let Ok(result) = roll::throw(&content) {
+            reply(&format!("{} (rolled {})", result, content))
         } else {
             reply("Invalid roll.")
         }
     },
 
-    "seen" => {
+    ("seen", args) => {
         match seen::search(db, target, &args) {
             Err(seen::Error::InvalidArgs) => wrong(),
             Err(seen::Error::NotFound)    => reply(NO_RESULTS),
@@ -247,47 +222,34 @@ pub fn respond<T: Responder>(
         }
     },
 
-    "select" => {
-        match content.parse() {
+    ("showmore", [i_s]) => {
+        match i_s.parse() {
             Err(_) => wrong(),
             Ok(0)  => wrong(),
-            Ok(i)  => match db.choices.run_choice(i) {
-                Ok(result) => reply(&result),
-                Err(_)     => reply(NO_RESULTS)
-            }
+            Ok(i)  => try_reply(db.choices.run_choice(i - 1))
         }
     },
 
-    "tell" => {
-        if len < 2 {
-            wrong()
-        } else {
-            db::log(db.add_tell(source, &args[0], &args[1..].join(" ")));
-            client.action(target, &format!("writes down {}'s message and nods.", source))
-        }
+    ("tell", args) if args.len() >= 2 => {
+        db::log(db.add_tell(source, &args[0], &args[1..].join(" ")));
+        client.action(target, &format!("writes down {}'s message and nods.", source))
     },
 
-    "wikipedia" => {
-        if len == 0 {
-            wrong()
-        } else if let Ok(result) = wikipedia::search(db, &content) {
-            reply(&result)
-        } else {
-            reply(NO_RESULTS)
-        }
-    },
+    ("wikipedia", []) => wrong(),
+    ("wikipedia", _) => 
+        try_reply(wikipedia::search(db, &content)),
     
-    "zyn" => {
+    ("zyn", []) => {
         reply("Marp.")
     },
 
-    _ => Ok(())
+    _ => wrong()
     }
 }
 
-fn usage(command: &str) -> String {
-    let noargs = format!("Usage: \x02{}\x02.", command);
-    let args = |xs| format!("Usage: \x02{}\x02 {}.", command, xs);
+fn usage(command: &str) -> Option<String> {
+    let noargs = Some(format!("Usage: \x02{}\x02.", command));
+    let args = |xs| Some(format!("Usage: \x02{}\x02 {}.", command, xs));
     if command == "auth" {
         args("level user")
     } else if "choose".starts_with(command) {
@@ -308,18 +270,22 @@ fn usage(command: &str) -> String {
         args("command")
     } else if command == "hug" {
         noargs
+    } else if command == "lastcreated" || command == "lc" {
+        noargs
+    } else if command == "name" {
+        args("[-f|-m]")
     } else if command == "quit" {
         noargs
     } else if command == "reload" {
         noargs
     } else if command == "roll" {
-        "Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF-2], [roll 2d6>3 - 1d4].".to_string()
+        Some("Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF-2], [roll 2d6>3 - 1d4].".to_string())
     } else if "seen".starts_with(&command) {
         args("[-f|-t] user [#channel]")
-    } else if "select".starts_with(&command) {
+    } else if command == "showmore" || command == "sm" {
         args("number")
     } else if "remindme".starts_with(&command) {
-        format!("Usage: {} [<days>d][<hours>h][<minutes>m] message. Example: [{} 4h30m Fix my voice filter.]", command, command)
+        Some(format!("Usage: {} [<days>d][<hours>h][<minutes>m] message. Example: [{} 4h30m Fix my voice filter.]", command, command))
     } else if "tell".starts_with(&command) {
         args("user message")
     } else if "wikipedia".starts_with(&command) {
@@ -327,10 +293,14 @@ fn usage(command: &str) -> String {
     } else if "zyn".starts_with(&command) {
         noargs
     } else {
-        "I'm sorry, I don't know that command.".to_owned()
+        None
     }
 }
 
-fn warn(msg: &str) -> Result<(), IrcError> {
-    Ok(log(color::WARN, msg))
+fn warn(db: &Db, msg: &str) -> String {
+    log(color::WARN, msg);
+    match &db.owner {
+        None        => "Something went wrong.".to_owned(),
+        Some(owner) => format!("Something went wrong. Please let {} know.", owner)
+    }
 }

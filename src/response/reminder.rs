@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::time::Duration;
 
@@ -24,5 +25,19 @@ pub fn parse_offset(s: &str) -> Option<Duration> {
         "*h"     => yield_offset(0,                  next(&mut groups)?, 0),
         "*m"     => yield_offset(0,                  0,                  next(&mut groups)?),
         _        => None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_offset() {
+        let zero = Some(Duration::from_secs(0));
+        assert!(["0d0h0m", "0d0h", "0d0m", "0d", "0h0m", "0h", "0m"]
+            .into_iter()
+            .all(|x| parse_offset(x) == zero));
+        assert_eq!(parse_offset("x0d0h0m"), None);
     }
 }

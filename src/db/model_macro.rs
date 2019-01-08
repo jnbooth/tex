@@ -9,7 +9,7 @@ macro_rules! model {
         }
 
         #[table_name=$table_name]
-        #[derive(Insertable)]
+        #[derive(Clone, Insertable, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
         pub struct $struct_name {
             $( pub $attr_name : $attr_type ),*
         }
