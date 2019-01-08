@@ -26,15 +26,21 @@ The PostgreSQL server from above must be running in order for the program to wor
 
 ## Commands
 
+Commands can be invoked in several ways. For example, any of the following will work:
+
+* .w Enron
+* !w Enron
+* So basically they're the new [w Enron].
+
 #### [choose], [ch]
 
-__Usage:__ `choose choices, separated, by commas`
+__Usage:__ `ch choices, separated, by commas`
 
 Randomly select an item from a list.
 
 #### [define], [def], [d]
 
-__Usage:__ `define word`
+__Usage:__ `def word`
 
 Look up the dictionary definition of a word.
 
@@ -46,7 +52,7 @@ Search for an image using Google.
 
 #### [google], [g]
 
-__Usage:__ `google query`
+__Usage:__ `g query`
 
 Search for a website using Google.
 
@@ -62,6 +68,10 @@ __Usage:__ `hug`
 
 Hug the bot!
 
+#### [lastcreated], [lc]
+
+__Usage:__ `lc`
+
 #### [name]
 
 __Usage:__ `name [-f|-m]`
@@ -70,7 +80,7 @@ Randomly generates a name. With no flags, gender is random. `-f` generates a fe
 
 #### [remindme], [remind], [r]
 
-__Usage:__ `remindme [<days>d][<hours>h][<minutes>m]`
+__Usage:__ `r [<days>d][<hours>h][<minutes>m] message`
 
 Add a reminder that will activate after a duration. When the reminder activates, the bot sends it to the user privately as soon as it sees a message from the user. Example: `[remindme 4h30m Fix my voice filter.]`
 
@@ -100,7 +110,7 @@ Send a message to another user. The bot will privately send the message to the u
 
 #### [wikipedia], [wiki], [w]
 
-__Usage:__ `wiki article`
+__Usage:__ `w article`
 
 Look up the search term on Wikipedia and returns a link to its article and an excerpt.
 
@@ -116,7 +126,7 @@ Promote or demote a user to a specified authorization level.
 
 #### [disable]
 
-__Usage:__ `enable command`
+__Usage:__ `disable command`
 
 Disable usage of a command in the same channel. The bot does not respond to disabled commands.
 
