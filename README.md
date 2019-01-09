@@ -68,7 +68,7 @@ __Usage:__ `hug`
 
 Hug the bot!
 
-#### [lastcreated], [lc]
+#### [lastcreated], [lc], [l]
 
 __Usage:__ `lc`
 
