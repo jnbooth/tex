@@ -40,7 +40,7 @@ fn either_search(api: &Api, client: &Client, query: &str, image: bool) -> IO<Str
         api.key, api.user, util::encode(query), if image { "&searchType=image" } else { "" }
     )).send()?;
     parse(&serde_json::from_reader(search_res)?, image)
-        .ok_or(failure::err_msg("Unable to parse Google results."))
+        .ok_or(failure::err_msg(format!("Unable to parse Google results for {}", query)))
 }
 
 pub fn search(api: &Api, client: &Client, query: &str) -> IO<String> {
@@ -65,22 +65,22 @@ mod test {
         assert_eq!(ellipses("...."), ".[…]");
     }
 
-    #[test]
+    #[test] #[ignore]
     fn test_search() {
         search(&new(), &Client::new(), "puma").unwrap();
     }
 
-    #[test]
+    #[test] #[ignore]
     fn test_search_fail() {
         assert!(search(&new(), &Client::new(), "!@#$").is_err());
     }
     
-    #[test]
+    #[test] #[ignore]
     fn test_search_image() {
         search_image(&new(), &Client::new(), "puma").unwrap();
     }
 
-    #[test]
+    #[test] #[ignore]
     fn test_search_image_fail() {
         assert!(search_image(&new(), &Client::new(), "!@#$").is_err());
     }

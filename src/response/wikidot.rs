@@ -57,7 +57,9 @@ impl Wikidot {
             .form(&full_args)
             .send()?;
         let json: serde_json::Value = serde_json::from_reader(res)?;
-        let body = get_body(&json).ok_or(failure::err_msg("Invalid response"))?;
+        let body = get_body(&json).ok_or(failure::err_msg(
+            format!("Invalid response from {} for {:?}", module_name, args))
+        )?;
         Ok(Document::from(body))
     }
 

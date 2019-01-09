@@ -37,7 +37,7 @@ pub fn search(client: &Client, query: &str) -> IO<String> {
     let word = page
         .find(Class("title-word"))
         .next()
-        .ok_or(failure::err_msg("Word not found."))?
+        .ok_or(failure::err_msg(format!("{} not found", query)))?
         .text()
         .trim()
         .to_owned();

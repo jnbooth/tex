@@ -17,8 +17,7 @@ use crate::response::choice::Choices;
 use crate::response::wikidot::Wikidot;
 use self::ban::Bans;
 use self::model::*;
-#[cfg(not(test))]
-use self::schema::*;
+#[cfg(not(test))] use self::schema::*;
 use self::name::Names;
 
 pub fn log<T>(res: QueryResult<T>) {
@@ -44,26 +43,23 @@ impl Apis {
 }
 
 pub struct Db {
-    #[cfg(not(test))]
-    conn:        PgConnection,
+    #[cfg(not(test))] 
+    conn: PgConnection,
+    #[cfg(test)]
+    seen: MultiMap<String, Seen>,
 
     pub client:  Client,
-
     pub nick:    String,
     pub owner:   Option<String>,
+    pub api:     Apis,
+    pub bans:    Option<Bans>,
+    pub choices: Choices,
+    pub names:   Names,
 
     reminders:   MultiMap<String, Reminder>,
     silences:    MultiMap<String, String>,
     tells:       MultiMap<String, Tell>,
-    users:       HashMap<String, User>,
-
-    #[cfg(test)]
-    seen: MultiMap<String, Seen>,
-    
-    pub api:     Apis,
-    pub bans:    Option<Bans>,
-    pub choices: Choices,
-    pub names:   Names
+    users:       HashMap<String, User>
 }
 
 impl Db {
@@ -78,14 +74,14 @@ impl Db {
             client:     Client::new(),
             nick:       env::get("IRC_NICK").to_lowercase(),
             owner:      env::opt("OWNER").map(|x| x.to_lowercase()),
-            reminders:  load_reminders(&conn)?,
-            silences:   load_silences(&conn)?,
-            tells:      load_tells(&conn)?,
-            users:      load_users(&conn)?,
             api:        Apis::new(),
             bans:       Bans::new(),
             choices:    Choices::new(),
             names:      Names::new(&conn).expect("Error loading names"),
+            reminders:  load_reminders(&conn)?,
+            silences:   load_silences(&conn)?,
+            tells:      load_tells(&conn)?,
+            users:      load_users(&conn)?,
             conn
         })
     }
@@ -96,15 +92,15 @@ impl Db {
             client:     Client::new(),
             nick:       env::get("IRC_NICK").to_lowercase(),
             owner:      env::opt("OWNER").map(|x| x.to_lowercase()),
+            api:        Apis::new(),
+            bans:       Bans::new(),
+            choices:    Choices::new(),
+            names:      Names::empty(),
             reminders:  MultiMap::new(),
             silences:   MultiMap::new(),
             tells:      MultiMap::new(),
             users:      HashMap::new(),
-            seen:       MultiMap::new(),
-            api:        Apis::new(),
-            bans:       Bans::new(),
-            choices:    Choices::new(),
-            names:      Names::empty()
+            seen:       MultiMap::new()
         })
     }
 
@@ -150,8 +146,8 @@ impl Db {
             auth,
             pronouns: self.users.get(&nick).and_then(|x| x.pronouns.to_owned())
         };
-        #[cfg(not(test))]
-        diesel::insert_into(user::table)
+        #[cfg(not(test))] diesel
+            ::insert_into(user::table)
             .values(&user)
             .on_conflict(user::nick)
             .do_update()
@@ -164,11 +160,11 @@ impl Db {
     pub fn delete_user(&mut self, nick_up: &str) -> QueryResult<bool> {
         let nick = nick_up.to_lowercase();
         let removed = self.users.remove(&nick);
-        #[cfg(not(test))]
-        diesel::delete(user::table.filter(user::nick.eq(&nick)))
+        #[cfg(not(test))] diesel
+            ::delete(user::table.filter(user::nick.eq(&nick)))
             .execute(&self.conn)?;
-        #[cfg(not(test))]
-        diesel::delete(seen::table.filter(seen::nick.eq(&nick)))
+        #[cfg(not(test))] diesel
+            ::delete(seen::table.filter(seen::nick.eq(&nick)))
             .execute(&self.conn)?;
         Ok(removed.is_some())
     }
@@ -182,8 +178,8 @@ impl Db {
             when:    when,
             message: message.to_owned()
         };
-        #[cfg(not(test))]
-        diesel::insert_into(reminder::table)
+        #[cfg(not(test))] diesel
+            ::insert_into(reminder::table)
             .values(&reminder)
             .execute(&self.conn)?;
         self.reminders.insert(nick, reminder);
@@ -194,8 +190,8 @@ impl Db {
         let when = SystemTime::now();
         let mut reminders = self.reminders.get_vec_mut(&nick)?;
         let expired = util::drain_filter(&mut reminders, |x| x.when < when);
-        #[cfg(not(test))]
-        log(diesel::delete(reminder::table
+        #[cfg(not(test))] log(diesel
+            ::delete(reminder::table
                 .filter(reminder::nick.eq(&nick))
                 .filter(reminder::when.lt(&when))
             ).execute(&self.conn));
@@ -211,8 +207,8 @@ impl Db {
             time:    SystemTime::now(),
             message: message.to_owned()
         };
-        #[cfg(not(test))]
-        diesel::insert_into(tell::table)
+        #[cfg(not(test))] diesel
+            ::insert_into(tell::table)
             .values(&tell)
             .execute(&self.conn)?;
         self.tells.insert(target, tell);
@@ -222,8 +218,8 @@ impl Db {
     pub fn get_tells(&mut self, nick_up: &str) -> Option<Vec<Tell>> {
         let nick = nick_up.to_lowercase();
         let tells = self.tells.remove(&nick)?;
-        #[cfg(not(test))]
-        log(diesel::delete(tell::table.filter(tell::target.eq(&nick)))
+        #[cfg(not(test))] log(diesel
+            ::delete(tell::table.filter(tell::target.eq(&nick)))
             .execute(&self.conn));
         Some(tells)
     }
@@ -236,20 +232,21 @@ impl Db {
         }
     }
 
-    pub fn set_enabled(&mut self, channel_up: &str, command_up: &str, enabled: bool) -> QueryResult<()> {
+    pub fn set_enabled(&mut self, channel_up: &str, command_up: &str, enabled: bool) 
+    -> QueryResult<()> {
         let channel = channel_up.to_lowercase();
         let command = command_up.to_lowercase();
         if enabled {
             util::multi_remove(&mut self.silences, &channel, &command);
-            #[cfg(not(test))]
-            diesel::delete(silence::table
+            #[cfg(not(test))] diesel
+                ::delete(silence::table
                 .filter(silence::channel.eq(&channel))
                 .filter(silence::command.eq(&command))
             ).execute(&self.conn)?;
         } else {
             self.silences.insert(channel.to_owned(), command.to_owned());
-            #[cfg(not(test))]
-            diesel::insert_into(silence::table)
+            #[cfg(not(test))] diesel
+                ::insert_into(silence::table)
                 .values(&Silence { channel, command })
                 .execute(&self.conn)?;
         }
@@ -269,8 +266,8 @@ impl Db {
                 latest:  message.to_owned(), latest_time: when,
                 total:   1 
             };
-            #[cfg(not(test))]
-            diesel::insert_into(seen::table)
+            #[cfg(not(test))] diesel
+                ::insert_into(seen::table)
                 .values(&seen)
                 .on_conflict((seen::channel, seen::nick))
                 .do_update()

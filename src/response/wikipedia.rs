@@ -97,14 +97,14 @@ fn search_in(query: &str) -> IO<Result<String, Vec<String>>> {
             encode(query)
         )).send()?
     )?;
-    let page = get_page(&searches).ok_or(failure::err_msg("Page not found"))?;
+    let page = get_page(&searches).ok_or(failure::err_msg(format!("{} page not found", query)))?;
     let entry = serde_json::from_reader(
         client.get(&format!(
             "https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|links&pllimit=100&exintro&explaintext&redirects=1&pageids={}",
             encode(&page.to_string())
         )).send()?
     )?;
-    Ok(get_entry(page, &entry).ok_or(failure::err_msg("Entry not found"))?)
+    Ok(get_entry(page, &entry).ok_or(failure::err_msg(format!("{} entry not found", entry)))?)
 }
 
 pub fn search(db: &mut Db, query: &str) -> IO<String> {
@@ -116,7 +116,7 @@ pub fn search(db: &mut Db, query: &str) -> IO<String> {
             for link in ambig {
                 db.choices.add(move || match search_in(&link) {
                     Ok(Ok(entry)) => Ok(entry),
-                    Ok(Err(_))    => Err(failure::err_msg("Couldn't disambiguate.")),
+                    Ok(Err(_))    => Err(failure::err_msg("Couldn't disambiguate")),
                     Err(e)        => Err(e)
                 })
             }
