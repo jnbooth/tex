@@ -69,53 +69,34 @@ mod tests {
         db
     }
 
-    fn clear(db: &mut Db) {
-        db.delete_user(USER).expect("Error deleting test user");
-    }
-
     #[test]
     fn test_first() {
-        let mut db = db_test();
-        let res = search(&db, CHAN, &["-f", USER]);
-        clear(&mut db);
         assert_eq!(
-            res.ok().unwrap(), 
+            search(&db_test(), CHAN, &["-f", USER]).ok().unwrap(), 
             format!("I first saw {} 0s ago, saying: first", USER)
         );
     }
 
     #[test]
     fn test_latest() {
-        let mut db = db_test();
-        let res = search(&db, CHAN, &[USER]);
-        clear(&mut db);
-
         assert_eq!(
-            res.ok().unwrap(), 
+            search(&db_test(), CHAN, &[USER]).ok().unwrap(), 
             format!("I last saw {} 0s ago, saying: latest", USER)
         );
     }
 
     #[test]
     fn test_total() {
-        let mut db = db_test();
-        let res = search(&db, CHAN, &["-t", USER]);
-        clear(&mut db);
-
         assert_eq!(
-            res.ok().unwrap(), 
+            search(&db_test(), CHAN, &["-t", USER]).ok().unwrap(), 
             format!("I have seen 2 total messages from {}.", USER)
         );
     }
 
     #[test]
     fn test_compound() {
-        let mut db = db_test();
-        let res = search(&db, "#!", &[USER, "-t", CHAN]);
-        clear(&mut db);
-
         assert_eq!(
-            res.ok().unwrap(), 
+            search(&db_test(), "#!", &[USER, "-t", CHAN]).ok().unwrap(), 
             format!("I have seen 2 total messages from {}.", USER)
         );
     }
