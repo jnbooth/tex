@@ -1,6 +1,6 @@
 # [Tex]
 
-[![Build Status](https://travis-ci.org/jnbooth/tex.svg?branch=master)](https://travis-ci.org/jnbooth/tex)
+[![Build Status](https://travis-ci.com/jnbooth/tex.svg?branch=master)](https://travis-ci.org/jnbooth/tex)
 
 A different approach to chatbot commands.
 
