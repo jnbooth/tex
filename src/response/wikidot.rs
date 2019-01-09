@@ -102,23 +102,3 @@ fn parse_time(timestamp: &str) -> IO<String> {
     let datetime: DateTime<FixedOffset> = DateTime::from_utc(naive, FixedOffset::west(TIMEZONE));
     Ok( util::since(SystemTime::from(datetime)) ?)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn new() -> Wikidot {
-        env::load();
-        Wikidot::new().expect("Error initializing Wikidot")
-    }
-
-    #[test]
-    fn test_last_created() {
-        println!("*** {}", new().last_created(&Client::new()).unwrap().join("\n*** "));
-    }
-
-    #[test]
-    fn test_votes() {
-        println!("{:?}", new().get_votes("SCP-3209"));
-    }
-}
