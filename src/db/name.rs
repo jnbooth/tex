@@ -17,14 +17,21 @@ struct NameList {
     dist: WeightedIndex<i32>
 }
 impl NameList {
-    pub fn new(names: Vec<Name>) -> Result<NameList, WeightedError> {
+    pub fn new(names: &[Name]) -> Result<NameList, WeightedError> {
         Ok(NameList { 
-            names:  names.clone().into_iter().map(|x| x.name).collect(),
-            dist: WeightedIndex::new(names.into_iter().map(|x| x.frequency))?
+            names: names.into_iter().map(|x| x.name.to_owned()).collect(),
+            dist:  WeightedIndex::new(names.into_iter().map(|x| x.frequency))?
         })
     }
     pub fn choose<T: Rng>(&self, rng: &mut T) -> String {
         self.names[self.dist.sample(rng)].to_owned()
+    }
+    #[cfg(test)]
+    pub fn empty() -> NameList {
+        NameList { 
+            names: vec![" ".to_owned()],
+            dist:  WeightedIndex::new(&[1]).expect("Error creating NameList") 
+        }
     }
 }
 
@@ -37,9 +44,9 @@ pub struct Names {
 impl Names {
     pub fn new(conn: &PgConnection) -> IO<Self> {
         Ok(Names {
-            female: NameList::new(name_female::table.load(conn)?)?,
-            male: NameList::new(name_male::table.load(conn)?)?,
-            last: NameList::new(name_last::table.load(conn)?)?
+            female: NameList::new(&name_female::table.load(conn)?)?,
+            male:   NameList::new(&name_male::table.load(conn)?)?,
+            last:   NameList::new(&name_last::table.load(conn)?)?
         })
     }
 
@@ -52,6 +59,15 @@ impl Names {
         };
         format!("{} {}", names.choose(&mut rng), self.last.choose(&mut rng))
     }
+
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Names {
+            female: NameList::empty(),
+            male:   NameList::empty(),
+            last:   NameList::empty()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -61,7 +77,6 @@ mod tests {
 
     #[test]
     fn test_gen() {
-        dotenv::dotenv().unwrap();
         let conn = establish_connection();
         let names = Names::new(&conn).unwrap();
         println!("Female: {}", names.gen(Gender::Female));

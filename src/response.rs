@@ -3,10 +3,10 @@ use std::time::SystemTime;
 use rand::Rng;
 
 use crate::{color, db, util};
-use crate::util::Gender;
 use crate::db::Db;
 use crate::color::log;
 use crate::responder::Responder;
+use crate::util::Gender;
 
 pub mod choice;
 mod dictionary;
@@ -19,10 +19,11 @@ mod wikipedia;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 
-const ABBREVIATE: [&str; 8] =
+const ABBREVIATE: [&str; 9] =
         [ "choose"
         , "define"
         , "google"
+        , "lastcreated"
         , "remindme"
         , "seen"
         , "tell"
@@ -52,15 +53,17 @@ pub fn respond<T: Responder>(
     target: &str, 
     message: &str
 ) -> Result<(), IrcError> {
-    let (command_base, content) = util::split_on(" ", message).unwrap_or((message, ""));;
+    let (command_base, content) = util::split_on(" ", message).unwrap_or((message, ""));
+    let owner = db.owner.to_owned();
     
     let reply  = |msg: &str| client.reply(target, source, msg);
+    let warn   = |msg: &str| T::warn(&owner, msg);
     let wrong  = || match usage(&command_base) {
         None    => Ok(()),
         Some(s) => reply(&s)
     };
     let unauth = || {
-        warn(&db, &format!("{} used an unauthorized command: {}", source, command_base)); 
+        warn(&format!("{} used an unauthorized command: {}", source, command_base)); 
         Ok(()) 
     };
     let try_reply = |msg: Result<String, _>| match msg {
@@ -74,7 +77,7 @@ pub fn respond<T: Responder>(
         content.split(' ').filter(|x| !x.is_empty()).collect::<Vec<&str>>().as_slice()
     ) {
     (command, _) if db.silenced(target, command) => {
-        warn(&db, &format!("{} attempted to use a silenced command: {}!", target, command));
+        warn(&format!("{} attempted to use a silenced command: {}!", target, command));
         Ok(())
     }
 
@@ -130,7 +133,7 @@ pub fn respond<T: Responder>(
             unauth()
         } else { 
             reply(&match db.delete_user(&nick) {
-                Err(e)    => warn(&db, &format!("Error deleting user {}: {}", nick, e)),
+                Err(e)    => warn(&format!("Error deleting user {}: {}", nick, e)),
                 Ok(true)  => format!("Forgot {}.", nick),
                 Ok(false) => format!("I don't know {}.", nick),
             })
@@ -165,7 +168,7 @@ pub fn respond<T: Responder>(
         match &db.api.wikidot {
             None => Ok(()),
             Some(wikidot) => match wikidot.last_created(&db.client) {
-                Err(e)    => reply(&warn(&db, &format!(".lc error: {}", e))),
+                Err(e)    => reply(&warn(&format!(".lc error: {}", e))),
                 Ok(pages) => { for page in pages { reply(&page)? } Ok(()) }
             }
         }
@@ -189,7 +192,7 @@ pub fn respond<T: Responder>(
         } else {
             log(color::DEBUG, "Reloading properties.");
             match db.reload() {
-                Err(e) => reply(&warn(&db, &format!("Error reloading database: {}", e))),
+                Err(e) => reply(&warn(&format!("Error reloading database: {}", e))),
                 Ok(()) => reply("Properties reloaded.")
             }
         }
@@ -270,7 +273,7 @@ fn usage(command: &str) -> Option<String> {
         args("command")
     } else if command == "hug" {
         noargs
-    } else if command == "lastcreated" || command == "lc" {
+    } else if command == "lc" || "lastcreated".starts_with(command) {
         noargs
     } else if command == "name" {
         args("[-f|-m]")
@@ -281,7 +284,7 @@ fn usage(command: &str) -> Option<String> {
     } else if command == "roll" {
         Some("Usage examples: [roll d20 + 4 - 2d6!], [roll 3dF-2], [roll 2d6>3 - 1d4].".to_string())
     } else if "seen".starts_with(&command) {
-        args("[-f|-t] user [#channel]")
+        args("[#channel] [-f|-t] user")
     } else if command == "showmore" || command == "sm" {
         args("number")
     } else if "remindme".starts_with(&command) {
@@ -294,13 +297,5 @@ fn usage(command: &str) -> Option<String> {
         noargs
     } else {
         None
-    }
-}
-
-fn warn(db: &Db, msg: &str) -> String {
-    log(color::WARN, msg);
-    match &db.owner {
-        None        => "Something went wrong.".to_owned(),
-        Some(owner) => format!("Something went wrong. Please let {} know.", owner)
     }
 }

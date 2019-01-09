@@ -7,24 +7,16 @@ use crate::db::Db;
 use crate::{IO, util};
 use super::choice;
 
-const CHARACTER_LIMIT: usize = 300;
-
 fn encode(s: &str) -> String {
     util::encode(&s.replace(" ", "_"))
 }
 
 fn clean_content(s: &str) -> String {
     lazy_static! {
-        static ref RE: Regex = Regex::new("\\s*\\([^()]+\\)").unwrap();
+        static ref RE_WIKI: Regex = Regex::new("\\s*\\([^()]+\\)")
+            .expect("RE_WIKI Regex failed to compile");
     }
-    let mut content = RE.replace_all(&s.replace("(listen)", ""), "").replace("  ", " ");
-    if content.len() > CHARACTER_LIMIT {
-        if let Some(i) = content[..CHARACTER_LIMIT-4].rfind(' ') {
-            content = content[..i].to_owned();
-        }
-        content.push_str(" […]");
-    }
-    content
+    RE_WIKI.replace_all(&s.replace("(listen)", ""), "").replace("  ", " ")
 }
 
 fn get_page(json: &Value) -> Option<u64> {
@@ -88,12 +80,12 @@ fn get_entry(page: u64, json: &Value) -> Option<Result<String, Vec<String>>> {
         }
     }
     Some( Ok(
-        format!(
-            "\x02{}\x02 ({}) {}", 
+        util::trim(&format!(
+            "{} \x02{}\x02: {}", 
+            format!("https://en.wikipedia.org/wiki/{}", encode(title)), 
             title, 
-            format!("en.wikipedia.org/wiki/{}", encode(title)), 
             clean_content(&extract.replace("\n", " "))
-        )
+        ))
     ) )
 }
 
@@ -130,5 +122,20 @@ pub fn search(db: &mut Db, query: &str) -> IO<String> {
             }
             Ok(suggests)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_page() {
+        assert_eq!(search(&mut Db::new(), "Monty Oum").unwrap(), "https://en.wikipedia.org/wiki/Monty_Oum \x02Monty Oum\x02: Monyreak \"Monty\" Oum was an American web-based animator and writer. A self-taught animator, he scripted and produced several crossover fighting video series, drawing the attention of internet production company Rooster Teeth, who hired him. […]");
+    }
+
+    #[test]
+    fn test_ambig() {
+        assert!(search(&mut Db::new(), "rock").unwrap().starts_with("Did you mean: (1)"));
     }
 }

@@ -6,11 +6,12 @@ use crate::{IO, util};
 
 pub fn throw(s: &str) -> IO<i64> {
     lazy_static! {
-        static ref RE: Regex = Regex::new("\\s*(\\+|-)\\s*").unwrap();
+        static ref RE_DICE: Regex = Regex::new("\\s*(\\+|-)\\s*")
+            .expect("RE_DICE Regex failed to compile");
     }
     let mut score: i64 = 0;
     let mut rng = rand::thread_rng();
-    for die in RE.replace_all(s, " $1").split(' ').filter(|x| !x.is_empty()) {
+    for die in RE_DICE.replace_all(s, " $1").split(' ').filter(|x| !x.is_empty()) {
         match util::split_on(die, "d") {
             None => {
                 score += die.parse::<i64>()?;

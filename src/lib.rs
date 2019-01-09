@@ -7,7 +7,7 @@ use std::iter::*;
 
 mod color;
 mod db;
-mod env;
+pub mod env;
 mod responder;
 mod response;
 #[macro_use] mod util;
@@ -47,7 +47,7 @@ fn parse_msg(message: Message) -> Option<(String, String, String)> {
 }
 fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<(), IrcError> {
     let text = message.to_string();
-    match parse_msg(message.clone()) {
+    match parse_msg(message.to_owned()) {
         None => print!("{}", text),
         Some((target, source, host)) => {
             match message.command {

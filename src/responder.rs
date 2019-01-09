@@ -12,6 +12,7 @@ pub trait Responder {
     fn privmsg(&self, target: &str, msg: &str) -> Result<(), IrcError>;
     fn reply(&self, target: &str, source: &str, msg: &str) -> Result<(), IrcError>;
     fn quit(&self, msg: &str) -> Result<(), IrcError>;
+    fn warn(owner: &Option<String>, msg: &str) -> String;
 }
 
 impl Responder for IrcClient {
@@ -33,6 +34,13 @@ impl Responder for IrcClient {
     }
     fn quit(&self, msg: &str) -> Result<(), IrcError> {
         self.send_quit(msg.to_owned())
+    }
+    fn warn(owner: &Option<String>, msg: &str) -> String {
+        log(color::WARN, msg);
+        match owner {
+            None    => "Something went wrong.".to_owned(),
+            Some(s) => format!("Something went wrong. Please let {} know.", s)
+        }
     }
 }
 
@@ -59,5 +67,8 @@ impl Responder for Debugger {
     fn quit(&self, msg: &str) -> Result<(), IrcError> {
         log(color::ECHO, msg);
         Ok(())
+    }
+    fn warn(_: &Option<String>, msg: &str) -> String {
+        panic!(msg.to_owned())
     }
 }

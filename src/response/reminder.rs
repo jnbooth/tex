@@ -12,10 +12,11 @@ fn next<'r, 't>(groups: &mut regex::Matches<'r, 't>) -> Option<u32> {
 
 pub fn parse_offset(s: &str) -> Option<Duration> {
     lazy_static! {
-        static ref RE: Regex = Regex::new("\\d+").unwrap();
+        static ref RE_OFFSET: Regex = Regex::new("\\d+")
+            .expect("RE_OFFSET Regex failed to compile");
     }
-    let format: &str = &RE.replace_all(s, "*").into_owned();
-    let mut groups = RE.find_iter(s);
+    let format: &str = &RE_OFFSET.replace_all(s, "*").into_owned();
+    let mut groups = RE_OFFSET.find_iter(s);
     match format {
         "*d*h*m" => yield_offset(next(&mut groups)?, next(&mut groups)?, next(&mut groups)?),
         "*d*h"   => yield_offset(next(&mut groups)?, next(&mut groups)?, 0),

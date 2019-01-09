@@ -27,10 +27,10 @@ fn parse(json: &Value, image: bool) -> Option<String> {
     let title = ellipses(&get("title")?);
     let link = get("link")?;
     if image {
-        Some(format!("{} - \x02{}\x02", link, title))
+        Some(format!("{} \x02{}\x02", link, title))
     } else {    
         let snippet = ellipses(&get("snippet")?.replace("\n", ""));
-        Some(format!("{} - \x02{}\x02: {}", link, title, snippet))
+        Some(format!("{} \x02{}\x02: {}", link, title, snippet))
     }
 }
 
@@ -55,7 +55,10 @@ pub fn search_image(api: &Api, client: &Client, query: &str) -> IO<String> {
 mod test {
     use super::*;
     use crate::db::Apis;
-    use dotenv::dotenv;
+
+    fn new() -> Api {
+        Apis::new().google.expect("Error initializing Google API")
+    }
 
     #[test]
     fn test_ellipses() {
@@ -64,25 +67,21 @@ mod test {
 
     #[test]
     fn test_search() {
-        dotenv().unwrap();
-        search(&Apis::new().google.unwrap(), &Client::new(), "puma").unwrap();
+        search(&new(), &Client::new(), "puma").unwrap();
     }
 
     #[test]
     fn test_search_fail() {
-        dotenv().unwrap();
-        assert!(search(&Apis::new().google.unwrap(), &Client::new(), "!@#$").is_err());
+        assert!(search(&new(), &Client::new(), "!@#$").is_err());
     }
     
     #[test]
     fn test_search_image() {
-        dotenv().unwrap();
-        search_image(&Apis::new().google.unwrap(), &Client::new(), "puma").unwrap();
+        search_image(&new(), &Client::new(), "puma").unwrap();
     }
 
     #[test]
     fn test_search_image_fail() {
-        dotenv().unwrap();
-        assert!(search_image(&Apis::new().google.unwrap(), &Client::new(), "!@#$").is_err());
+        assert!(search_image(&new(), &Client::new(), "!@#$").is_err());
     }
 }

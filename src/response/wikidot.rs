@@ -68,10 +68,10 @@ impl Wikidot {
             ("rating", ">=-10"),
             ("limit", &LAST_CREATED.to_string())
         ])?;
-        Ok(pages.find(Class("list-pages-item")).filter_map(|x| self.parse_lc(x)).collect())
+        Ok(pages.find(Class("list-pages-item")).filter_map(|x| self.parse_lc(&x)).collect())
     }    
 
-    fn parse_lc(&self, val: Node) -> Option<String> {
+    fn parse_lc(&self, val: &Node) -> Option<String> {
         let a = val.find(Name("h1").descendant(Name("a"))).next()?;
         let title = a.text();
         let link = a.attr("href")?;
@@ -106,8 +106,8 @@ mod tests {
     use super::*;
 
     fn new() -> Wikidot {
-        dotenv::dotenv().unwrap();
-        Wikidot::new().unwrap()
+        env::load();
+        Wikidot::new().expect("Error initializing Wikidot")
     }
 
     #[test]

@@ -72,8 +72,8 @@ fn load_bans(page: &str) -> IO<MultiMap<String, Ban>> {
             for tr in node.find(Name("tr")) {
                 if let Some(ban) = Ban::new(&tr) {
                     if ban.active() {
-                        for chan in chans.clone() {
-                            bans.insert(chan.to_owned(), ban.clone())
+                        for chan in chans.to_owned() {
+                            bans.insert(chan.to_owned(), ban.to_owned())
                         }
                     }
                 }

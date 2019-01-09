@@ -4,8 +4,21 @@ use percent_encoding::utf8_percent_encode;
 use std::iter::*;
 use std::time::{Duration, SystemTime, SystemTimeError};
 
+const CHARACTER_LIMIT: usize = 300;
+
 pub fn encode(s: &str) -> String {
     utf8_percent_encode(s, percent_encoding::DEFAULT_ENCODE_SET).to_string()
+}
+
+pub fn trim(s: &str) -> String {
+    let mut content = s.to_owned();
+    if content.len() > CHARACTER_LIMIT {
+        if let Some(i) = content[..CHARACTER_LIMIT-4].rfind(' ') {
+            content = content[..i].to_owned();
+        }
+        content.push_str(" […]");
+    }
+    content
 }
 
 pub fn since(when: SystemTime) -> Result<String, SystemTimeError> {

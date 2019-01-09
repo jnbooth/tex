@@ -56,8 +56,10 @@ pub fn search(client: &Client, query: &str) -> IO<String> {
 
 fn clean_content(s: &str) -> String {
     lazy_static! {
-        static ref RE_SPACE: Regex = Regex::new(" \\([^()]+\\) ").unwrap();
-        static ref RE_ALL:   Regex = Regex::new("\\s*\\([^()]+\\)\\s*").unwrap();
+        static ref RE_SPACE: Regex = Regex::new(" \\([^()]+\\) ")
+            .expect("RE_SPACE Regex failed to compile");
+        static ref RE_ALL: Regex = Regex::new("\\s*\\([^()]+\\)\\s*")
+            .expect("RE_ALL Regex failed to compile");
     };
     let mut clean = RE_SPACE.replace_all(s, " ").into_owned();
     clean = RE_ALL.replace_all(&clean, "").into_owned();
