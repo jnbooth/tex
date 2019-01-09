@@ -3,11 +3,16 @@ use irc::client::prelude::Config;
 use crate::Api;
 
 pub fn load() {
-    dotenv::dotenv().expect("Error loading .env");
+    match dotenv::dotenv() {
+        Ok(_) => (),
+        Err(dotenv::Error::Io(_)) => (),
+        _ => panic!("Error loading .env")
+    }
 }
 
 pub fn get(var: &str) -> String {
-    std::env::var(var).expect(&format!("{} must be set in .env", var))
+    std::env::var(var)
+        .expect(&format!("{} must be defined in .env or as an environment variable", var))
 }
 
 pub fn opt(var: &str) -> Option<String> {

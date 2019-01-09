@@ -75,7 +75,7 @@ mod tests {
     use super::*;
     use super::super::establish_connection;
 
-    #[test]
+    #[test] #[ignore]
     fn test_gen() {
         let conn = establish_connection();
         let names = Names::new(&conn).unwrap();

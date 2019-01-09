@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 chrono = "*"
 diesel = { version = "*", features = ["postgres"] }
-dotenv = "*"
+dotenv = "^0.13.0"
 failure = "*"
 humantime = "*"
 irc = "*"

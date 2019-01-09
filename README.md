@@ -1,5 +1,7 @@
 # [Tex]
+
 [![Build Status](https://travis-ci.org/jnbooth/tex.svg?branch=master)](https://travis-ci.org/jnbooth/tex)
+
 A different approach to chatbot commands.
 
 ## Development
