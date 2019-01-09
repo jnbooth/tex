@@ -1,6 +1,7 @@
 # [Tex]
 
 [![Build Status](https://travis-ci.com/jnbooth/tex.svg?branch=master)](https://travis-ci.org/jnbooth/tex)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A different approach to chatbot commands.
 
