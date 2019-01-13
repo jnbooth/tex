@@ -4,9 +4,9 @@ use crate::Api;
 
 pub fn load() {
     match dotenv::dotenv() {
-        Ok(_) => (),
         Err(dotenv::Error::Io(_)) => (),
-        _ => panic!("Error loading .env")
+        Ok(_)                     => (),
+        _                         => panic!("Error loading .env")
     }
 }
 
@@ -29,10 +29,13 @@ pub fn api(prefix: &str, user: &str, key: &str) -> Option<Api> {
 
 pub fn irc() -> Config {
     Config {
-        server:   Some(get("IRC_SERVER")),
-        nickname: Some(get("IRC_NICK")),
-        password: Some(get("IRC_PASSWORD")),
-        channels: Some(get("AUTOJOIN").split(',').map(|x| format!("#{}", x)).collect()),
+        server:       Some(get("IRC_SERVER")),
+        nickname:     Some(get("IRC_NICK")),
+        password:     Some(get("IRC_PASSWORD")),
+        channels:     Some(get("AUTOJOIN").split(',').map(|x| format!("#{}", x)).collect()),
+        should_ghost: Some(true),
+        #[cfg(test)]
+        use_mock_connection: Some(true),
         ..Config::default()
     }
 }

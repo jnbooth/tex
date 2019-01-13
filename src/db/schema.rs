@@ -1,4 +1,13 @@
 table! {
+    memo (id) {
+        id -> Int4,
+        channel -> Varchar,
+        user -> Varchar,
+        message -> Varchar,
+    }
+}
+
+table! {
     name_female (name) {
         name -> Varchar,
         frequency -> Int4,
@@ -34,7 +43,7 @@ table! {
 table! {
     reminder (id) {
         id -> Int4,
-        nick -> Varchar,
+        user -> Varchar,
         when -> Timestamp,
         message -> Varchar,
     }
@@ -44,7 +53,7 @@ table! {
     seen (id) {
         id -> Int4,
         channel -> Varchar,
-        nick -> Varchar,
+        user -> Varchar,
         first -> Varchar,
         first_time -> Timestamp,
         latest -> Varchar,
@@ -80,6 +89,7 @@ table! {
 }
 
 allow_tables_to_appear_in_same_query!(
+    memo,
     name_female,
     name_last,
     name_male,

@@ -24,9 +24,13 @@ Once complete, the SQL server is safe to shut down.
 
 ### Building
 
-To build and run the project, use `cargo run --release`. To build without running it, use `cargo build --release`. Note that the first time building the project will take much longer in order to download and compile dependencies. 
+To build and run the project, use `cargo run --release`. To run it in local offline mode, use `cargo run --release -- -o`. To build without running it, use `cargo build --release`. Note that the first time building the project will take much longer in order to download and compile dependencies. 
 
 The PostgreSQL server from above must be running in order for the program to work.
+
+### Testing
+
+To test the project, use `cargo test`. By default, the test skips tests that require database access or API keys with thresholds. To run those tests, use `cargo test -- --ignored`. Note that in order to avoid false positives, optional features such as bans will fail their tests if disabled.
 
 ## Commands
 
@@ -38,31 +42,31 @@ Commands can be invoked in several ways. For example, any of the following will 
 
 #### [choose], [ch]
 
-__Usage:__ `ch choices, separated, by commas`
+__Usage:__ `ch <choices, separated, by commas>`
 
 Randomly select an item from a list.
 
 #### [define], [def], [d]
 
-__Usage:__ `def word`
+__Usage:__ `def <word>`
 
 Look up the dictionary definition of a word.
 
 #### [gis]
 
-__Usage:__ `gis query`
+__Usage:__ `gis <query>`
 
 Search for an image using Google.
 
 #### [google], [g]
 
-__Usage:__ `g query`
+__Usage:__ `g <query>`
 
 Search for a website using Google.
 
 #### [help]
 
-__Usage:__ `help command`
+__Usage:__ `help <command>`
 
 Display usage help for a command.
 
@@ -76,6 +80,30 @@ Hug the bot!
 
 __Usage:__ `lc`
 
+#### [memo]
+
+__Usage:__ `memo <user>`
+
+Displays a user's memo in the current channel. A user can only have one memo per channel.
+
+##### [memo add]
+
+__Usage:__ `memo add <user> <message>`
+
+Stores a memo for a user. Fails if the user already has a memo.
+
+##### [memo append], [rem]
+
+__Usage:__ `memo append <user> <message>`
+
+Stores a memo for a user. If the user already has a memo, the message is appended to the end of it.
+
+##### [memo del]
+
+__Usage:__ `memo del <user> <message>`
+
+Deletes a user's memo. Fails if the memo differs from the message provided.
+
 #### [name]
 
 __Usage:__ `name [-f|-m]`
@@ -84,7 +112,7 @@ Randomly generates a name. With no flags, gender is random. `-f` generates a fe
 
 #### [remindme], [remind], [r]
 
-__Usage:__ `r [<days>d][<hours>h][<minutes>m] message`
+__Usage:__ `r [<days>d][<hours>h][<minutes>m] <message>`
 
 Add a reminder that will activate after a duration. When the reminder activates, the bot sends it to the user privately as soon as it sees a message from the user. Example: `[remindme 4h30m Fix my voice filter.]`
 
@@ -96,25 +124,25 @@ Randomly roll some dice. Basic dice notation follows the format of `<# of dice>d
 
 #### [seen], [se]
 
-__Usage:__ `seen [-f|-t] nick [#channel]`
+__Usage:__ `seen [#<channel>] [-f|-t] <user>`
 
 With no flags, display the most recent message seen from a user and how long ago it occurred. `-f` displays the first message seen from a user and how long ago it occurred. `-t` displays the total number of messages seen from a user. If a channel is not given, the current channel is used. Note: `/me` emotes are ignored.
 
 #### [showmore], [sm]
 
-__Usage:__ `sm number`
+__Usage:__ `sm <number>`
 
 Select one of several options given by the bot, such as when it retrieves a Wikipedia disambiguation page.
 
 #### [tell], [t]
 
-__Usage:__ `tell user message`
+__Usage:__ `tell <user> <message>`
 
 Send a message to another user. The bot will privately send the message to the user when it next sees a message from them.
 
 #### [wikipedia], [wiki], [w]
 
-__Usage:__ `w article`
+__Usage:__ `w <article>`
 
 Look up the search term on Wikipedia and returns a link to its article and an excerpt.
 
@@ -124,27 +152,27 @@ These commands can only be used by users who have been granted authority by the 
 
 ####  [auth]
 
-__Usage:__ `auth level nick`
+__Usage:__ `auth <level> <user>`
 
 Promote or demote a user to a specified authorization level.
 
 #### [disable]
 
-__Usage:__ `disable command`
+__Usage:__ `disable <command>`
 
 Disable usage of a command in the same channel. The bot does not respond to disabled commands.
 
 #### [enable]
 
-__Usage:__ `enable command`
+__Usage:__ `enable <command>`
 
 Enable usage of a command in the same channel.
 
 #### [forget]
 
-__Usage:__ `forget nick`
+__Usage:__ `forget <user>`
 
-Delete all information about a user.
+Delete all information about a user, including tells from and to them.
 
 #### [quit]
 
@@ -156,4 +184,4 @@ Shut down the bot.
 
 __Usage:__ `reload`
 
-Reload the bot's data from its SQL database.
+Reload the bot's data from its SQL database and supplemental webpages.

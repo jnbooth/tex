@@ -7,7 +7,7 @@ use select::node::Node;
 use select::predicate::{Class, Name};
 use std::borrow::ToOwned;
 
-use crate::{IO, env};
+use crate::{Context, IO, env};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Ban {
@@ -38,8 +38,8 @@ impl Ban {
     }
     pub fn active(&self) -> bool {
         match self.status {
-            None         => true,
-            Some(expiry) => expiry >= Local::today().naive_local()
+            None    => true,
+            Some(t) => t >= Local::today().naive_local()
         }
     }
     pub fn matches(&self, nick: &String, host: &String) -> bool {
@@ -47,17 +47,18 @@ impl Ban {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bans(MultiMap<String, Ban>);
 
 impl Bans {
     pub fn new() -> Option<Bans> {
         Some(Bans(load_bans(&env::opt("BAN_PAGE")?).ok()?))
     }
-    pub fn get_ban(&self, channel_up: &str, nick_up: &str, host_up: &str) -> Option<String> {
-        let bans = self.0.get_vec(&channel_up.to_lowercase())?;
-        let nick = nick_up.to_lowercase();
-        let host = host_up.to_lowercase();
-        let ban = bans.into_iter().filter(|x| x.active() && x.matches(&nick, &host)).next()?;
+    pub fn get_ban(&self, ctx: &Context) -> Option<String> {
+        let bans = self.0.get_vec(&ctx.channel)?;
+        let ban = bans.into_iter()
+            .filter(|x| x.active() && x.matches(&ctx.user, &ctx.host))
+            .next()?;
         Some(ban.reason.to_owned())
     }
 }

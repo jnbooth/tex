@@ -2,12 +2,19 @@ use core::hash::Hash;
 use multimap::MultiMap;
 use percent_encoding::utf8_percent_encode;
 use std::iter::*;
+use std::string::ToString;
 use std::time::{Duration, SystemTime, SystemTimeError};
 
 const CHARACTER_LIMIT: usize = 300;
 
 pub fn encode(s: &str) -> String {
     utf8_percent_encode(s, percent_encoding::DEFAULT_ENCODE_SET).to_string()
+}
+
+pub fn own(xs: &[&str]) -> Vec<String> {
+    xs.into_iter()
+        .map(ToString::to_string)
+        .collect()
 }
 
 pub fn trim(s: &str) -> String {
@@ -37,7 +44,7 @@ pub fn show_time(when: SystemTime) -> String {
 
 pub fn split_on<'a>(pat: &str, s: &'a str) -> Option<(&'a str, &'a str)> {
     match s.find(pat) {
-        None => None,
+        None    => None,
         Some(i) => {
             let (before, after) = s.split_at(i);
             Some((before, &after[pat.len()..]))

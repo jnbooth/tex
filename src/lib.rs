@@ -2,19 +2,31 @@
 
 use irc::client::prelude::*;
 use irc::error::IrcError;
-use irc::proto::Command::*;
+use std::io;
+use std::io::BufRead;
 use std::iter::*;
+use std::time::SystemTime;
 
-mod color;
+use self::db::Db;
+use self::command::Commands;
+
+mod command;
 mod db;
+mod error;
 pub mod env;
-mod responder;
-mod response;
-#[macro_use] mod util;
+mod output;
+pub mod local;
+mod logging;
+mod handler;
+mod wikidot; 
 
-use crate::color::log_part;
-use crate::db::Db;
-use crate::responder::Responder;
+#[macro_use] pub mod util;
+
+const CAPABILITIES: [Capability; 3] =
+    [ Capability::ChgHost
+    , Capability::ExtendedJoin
+    , Capability::MultiPrefix
+    ];
 
 type IO<T> = Result<T, failure::Error>;
 
@@ -24,83 +36,73 @@ pub struct Api {
     key:  String
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Context {
+    pub channel: String,
+    pub nick:    String,
+    pub host:    String,
+    pub user:    String,
+    pub auth:    i32,
+    pub time:    SystemTime
+}
+impl Context {
+    pub fn new(db: &Db, message: Message) -> Option<Context> {
+        let channel = message.response_target()?.to_lowercase();
+        let prefix  = message.prefix?.to_owned();
+        let nick    = prefix.split('!').next()?.to_owned();
+        let host    = prefix.split('@').last()?.to_owned();
+        let user    = nick.to_lowercase();
+        let auth    = db.auth(&user);
+        let time    = SystemTime::now();
+
+        Some(Context { channel, nick, host, user, auth, time })
+    }
+    pub fn since(&self) -> String {
+        match self.time.elapsed() {
+            Err(_) => "now ".to_owned(),
+            Ok(x)  => format!("{}.{:02}s ", x.as_secs(), x.subsec_millis() / 10)
+        }
+    }
+    #[cfg(test)]
+    pub fn mock(channel: &str, nick: &str) -> Context {
+        Context { 
+             channel: channel.to_lowercase(),
+             nick:    nick.to_owned(),
+             host:    String::new(),
+             user:    nick.to_lowercase(),
+             auth:    0,
+             time:    SystemTime::now()
+        }
+    }
+}
+
 pub fn run() -> Result<(), IrcError> {
+    let mut cmds = Commands::new();
     let mut db = Db::new();
     let mut reactor = IrcReactor::new()?;
     let client = reactor.prepare_client_and_connect(&env::irc())?;
+    client.send_cap_req(&CAPABILITIES).expect("Error negotiating capabilities");
     client.identify()?;
 
-    reactor.register_client_with_handler(client, move |c, m| handler(&mut db, c, m));
+    reactor.
+        register_client_with_handler(client, move |c, m| handler::handle(m, &mut cmds, c, &mut db));
     reactor.run()?;
 
     Ok(())
 }
 
-fn parse_msg(message: Message) -> Option<(String, String, String)> {
-    let target = message.response_target()?.to_owned();
-    let prefix = message.prefix?.to_owned();
-    Some((
-        target, 
-        prefix.split('!').next()?.to_owned(),
-        prefix.split('@').last()?.to_owned()
-    ))
-}
-fn handler<T: Responder>(db: &mut Db, client: &T, message: Message) -> Result<(), IrcError> {
-    let text = message.to_string();
-    match parse_msg(message.to_owned()) {
-        None => print!("{}", text),
-        Some((target, source, host)) => {
-            match message.command {
-                JOIN(_, _, _) => {
-                    match &db.bans {
-                        None       => print!("{}", text),
-                        Some(bans) => match bans.get_ban(&target, &source, &host) {
-                            None         => print!("{}", text),
-                            Some(reason) => {
-                                log_part(color::WARN, &text);
-                                client.ban(&target, &source, &reason)?;
-                            }
-                        }
-                    }
-                },
-                PRIVMSG(_, msg) => {
-                    for reminder in db.get_reminders(&source).into_iter().flatten() {
-                        client.privmsg(&source, &format!("Reminder: {}", reminder.message))?;
-                    }
-                    for tell in db.get_tells(&source).into_iter().flatten() {
-                        client.privmsg(&source, &format!(
-                            "From {} at {}: {}", tell.sender, util::show_time(tell.time), tell.message
-                        ))?;
-                    }
-                    let commands = get_commands(&msg);
-                    if commands.is_empty() {
-                        print!("{}", text);
-                    } else {
-                        log_part(color::ASK, &text);
-                        for command in commands {
-                            response::respond(db, client, &source, &target, command)?
-                        }
-                    }
-                    db::log(db.add_seen(&target, &source, &msg));
-                },
-                _ => print!("{}", text)
-            }
-        }
+pub fn offline() -> Result<(), failure::Error> {
+    let client = output::Offline;
+    let mut cmds = Commands::new();
+    let mut db = Db::new();
+    
+    println!("Awaiting input.");
+    for line in io::stdin().lock().lines() {
+        let message = format!(
+            ":Jabyrwock!~jabyrwock@7B468DF6:FEE59C82:7ED85AB8:IP PRIVMSG #projectfreelancer :{}",
+            line?
+        ).parse()?;
+        handler::handle(message, &mut cmds, &client, &mut db)?;
     }
     Ok(())
-}
-
-fn get_commands(message: &str) -> Vec<&str> {
-    match (message.chars().next(), message.get(1..)) {
-        (Some('!'), Some(xs)) => vec![xs],
-        (Some('.'), Some(xs)) => vec![xs],
-        _ => message
-            .split('[')
-            .skip(1)
-            .filter_map(|x| x.find(']').and_then(|i| {
-                let cmd = x[..i].trim();
-                if cmd.is_empty() { None } else { Some(cmd) }
-            }))
-            .collect()
-    }
 }

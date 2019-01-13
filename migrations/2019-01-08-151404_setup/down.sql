@@ -1,3 +1,4 @@
+DROP TABLE "memo";
 DROP TABLE "page";
 DROP TABLE "reminder";
 DROP TABLE "seen";

@@ -1,3 +1,10 @@
+CREATE TABLE "memo" (
+  "id"      SERIAL  PRIMARY KEY,
+  "channel" CHARACTER VARYING  NOT NULL,
+  "user"    CHARACTER VARYING  NOT NULL,
+  "message" CHARACTER VARYING  NOT NULL,
+  CONSTRAINT MemoContext UNIQUE ("channel", "user")
+);
 CREATE TABLE "page" (
   "url"    CHARACTER VARYING  PRIMARY KEY,
   "name"   CHARACTER VARYING  NOT NULL,
@@ -6,20 +13,20 @@ CREATE TABLE "page" (
 );
 CREATE TABLE "reminder" (
   "id"      SERIAL  PRIMARY KEY,
-  "nick"    CHARACTER VARYING  NOT NULL,
+  "user"    CHARACTER VARYING  NOT NULL,
   "when"    TIMESTAMP  NOT NULL,
   "message" CHARACTER VARYING  NOT NULL
 );
 CREATE TABLE "seen" (
   "id"          SERIAL  PRIMARY KEY,
   "channel"     CHARACTER VARYING  NOT NULL,
-  "nick"        CHARACTER VARYING  NOT NULL,
+  "user"        CHARACTER VARYING  NOT NULL,
   "first"       CHARACTER VARYING  NOT NULL,
   "first_time"  TIMESTAMP  NOT NULL,
   "latest"      CHARACTER VARYING  NOT NULL,
   "latest_time" TIMESTAMP  NOT NULL,
   "total"       INT  NOT NULL  DEFAULT 1,
-  CONSTRAINT SeenContext UNIQUE ("channel", "nick")
+  CONSTRAINT SeenContext UNIQUE ("channel", "user")
 );
 CREATE TABLE "silence" (
   "id"      SERIAL  PRIMARY KEY,
