@@ -28,10 +28,30 @@ pub fn trim(s: &str) -> String {
     content
 }
 
+pub fn ago(when: SystemTime) -> Result<String, SystemTimeError> {
+    let dur = chrono::Duration::seconds(when.elapsed()?.as_secs() as i64);
+    let weeks = dur.num_weeks();
+    if weeks > 52 {
+        Ok(format!("{} years", weeks / 52))
+    } else if weeks > 1 {
+        Ok(format!("{} weeks", weeks))
+    } else if dur.num_days() > 1 {
+        Ok(format!("{} days", dur.num_days()))
+    } else if dur.num_hours() > 1 {
+        Ok(format!("{} hours", dur.num_hours()))
+    } else if dur.num_minutes() > 1 {
+        Ok(format!("{} minutes", dur.num_minutes()))
+    } else if dur.num_seconds() > 1 {
+        Ok(format!("{} seconds", dur.num_seconds()))
+    } else {
+        Ok("now".to_owned())
+    }
+}
+
 pub fn since(when: SystemTime) -> Result<String, SystemTimeError> {
-    let dur = when.elapsed()?.as_secs();
+    let secs = when.elapsed()?.as_secs();
     Ok(humantime::format_duration(
-        Duration::from_secs(if dur < 60 { dur } else { dur / 60 * 60 })
+        Duration::from_secs(if secs < 60 { secs } else { secs / 60 * 60 })
     ).to_string())
 }
 

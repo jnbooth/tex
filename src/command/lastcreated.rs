@@ -1,5 +1,4 @@
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
-use reqwest::Client;
 use select::node::Node;
 use select::predicate::{Class, Name, Predicate};
 use std::time::SystemTime;
@@ -25,7 +24,7 @@ impl<O: Output + 'static> Command<O> for LastCreated {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, _: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        for page in self.last_created(&db.client)? {
+        for page in self.last_created(&db)? {
             irc.reply(ctx, &page)?;
         }
         Ok(())
@@ -37,23 +36,29 @@ impl LastCreated {
         LastCreated { wiki }
     }
 
-    fn last_created(&self, client: &Client) -> Outcome<Vec<String>> {
-        let pages = self.wiki.request_module("list/ListPagesModule", client, &[
+    fn last_created(&self, db: &Db) -> Outcome<Vec<String>> {
+        let pages = self.wiki.request_module("list/ListPagesModule", &db.client, &[
             ("body", "title created_by created_at"),
             ("order", "created_at desc"),
             ("rating", ">=-10"),
             ("limit", &LIMIT.to_string())
         ]).map_err(Throw)?;
-        Ok(pages.find(Class("list-pages-item")).filter_map(|x| self.parse_lc(&x)).collect())
+        Ok(pages.find(Class("list-pages-item")).filter_map(|x| self.parse_lc(&x, db)).collect())
     }    
 
-    fn parse_lc(&self, val: &Node) -> Option<String> {
+    fn parse_lc(&self, val: &Node, db: &Db) -> Option<String> {
         let a = val.find(Name("h1").descendant(Name("a"))).next()?;
-        let title = a.text();
         let link = a.attr("href")?;
         let author = val.find(Class("printuser").descendant(Name("a"))).last()?.text();
         let timestamp = val.find(Class("odate")).next()?.text();
         let ago = parse_time(&timestamp).ok()?;
+        let mut title = a.text();
+        if let Some(more) = db.titles.get(&title) {
+            if more != &title && more != "[ACCESS DENIED]" {
+                title.push_str(": ");
+                title.push_str(more);
+            }
+        }
         Some(format!("{} ({} ago by {}): http://{}{}", title, ago, author, self.wiki.root, link))
     }
 }
@@ -61,5 +66,5 @@ impl LastCreated {
 fn parse_time(timestamp: &str) -> Outcome<String> {
     let naive = NaiveDateTime::parse_from_str(&timestamp, "%_d %b %Y %H:%M")?;
     let datetime: DateTime<FixedOffset> = DateTime::from_utc(naive, FixedOffset::west(TIMEZONE));
-    Ok( util::since(SystemTime::from(datetime)) ?)
+    Ok(util::ago(SystemTime::from(datetime))?)
 }

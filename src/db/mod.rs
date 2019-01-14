@@ -1,11 +1,14 @@
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
+use hashbrown::HashMap;
 use multimap::MultiMap;
 use reqwest::Client;
 use std::borrow::ToOwned;
-use hashbrown::HashMap;
 #[cfg(not(test))] use std::iter::*;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::TryRecvError::{Empty, Disconnected};
 use std::time::SystemTime;
+
 
 #[macro_use] mod model_macro;
 mod ban;
@@ -16,6 +19,7 @@ use crate::logging;
 use crate::local::LocalMap;
 use crate::{Context, env, util};
 use self::ban::Bans;
+
 pub use self::model::*;
 #[cfg(not(test))] use self::schema::*;
 
@@ -41,7 +45,10 @@ pub struct Db {
     pub reminders: MultiMap<String, Reminder>,
     pub silences:  LocalMap<Silence>,
     pub tells:     MultiMap<String, Tell>,
-    pub users:     HashMap<String, User>
+    pub users:     HashMap<String, User>,
+
+    pub titles:    HashMap<String, String>,
+    pub titles_r:  Option<Receiver<(String, String)>>
 }
 
 impl Db {
@@ -64,6 +71,9 @@ impl Db {
             silences:  load_silences(&conn)?,
             tells:     load_tells(&conn)?,
             users:     load_users(&conn)?,
+
+            titles:    HashMap::new(),
+            titles_r:  None,
             conn
         })
     }
@@ -83,7 +93,28 @@ impl Db {
             tells:     MultiMap::new(),
             users:     HashMap::new(),
             seen:      LocalMap::new(),
+
+            titles:    HashMap::new(),
+            titles_r:  None
         })
+    }
+
+    pub fn listen(&mut self) {
+        if let Some(titles_r) = &self.titles_r {
+            loop {
+                match titles_r.try_recv() {
+                    Err(Empty)        => break,
+                    Err(Disconnected) => { self.titles_r = None; break },
+                    Ok((k, v))        => {
+                        if v == "[ACCESS DENIED]" {
+                            self.titles.remove(&k);
+                        } else {
+                            self.titles.insert(k, v);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[cfg(not(test))]

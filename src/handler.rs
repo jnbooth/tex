@@ -14,8 +14,9 @@ use crate::error::*;
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 const CHARACTER_LIMIT: usize = 429;
 
-pub fn handle<O: Output>(message: Message, cmds: &mut Commands<O>, client: &O, db: &mut Db) 
+pub fn handle<O: Output>(message: Message, cmds: &mut Commands<O>, irc: &O, db: &mut Db) 
 -> Result<(), IrcError> {
+    db.listen();
     let text = message.to_string();
     match Context::new(db, message.to_owned()) {
         None      => print!("{}", text),
@@ -28,18 +29,18 @@ pub fn handle<O: Output>(message: Message, cmds: &mut Commands<O>, client: &O, d
                             None         => print!("{}", text),
                             Some(reason) => {
                                 log_part(WARN, &text);
-                                client.ban(&ctx, &reason)?;
+                                irc.ban(&ctx, &reason)?;
                             }
                         }
                     }
                 },
                 PRIVMSG(_, msg) => {
                     for reminder in db.get_reminders(&ctx).into_iter().flatten() {
-                        client.pm(&ctx, &format!("Reminder: {}", reminder.message)
+                        irc.pm(&ctx, &format!("Reminder: {}", reminder.message)
                         )?;
                     }
                     for tell in db.get_tells(&ctx).into_iter().flatten() {
-                        client.pm(&ctx, &format!(
+                        irc.pm(&ctx, &format!(
                             "From {} at {}: {}", tell.sender, util::show_time(tell.time), tell.message
                         ))?;
                     }
@@ -49,7 +50,7 @@ pub fn handle<O: Output>(message: Message, cmds: &mut Commands<O>, client: &O, d
                     } else {
                         log_part(ASK, &text);
                         for command in commands {
-                            run(cmds, command, client, &ctx, db)?
+                            run(cmds, command, irc, &ctx, db)?
                         }
                     }
                     db::log(db.add_seen(&ctx, &msg));

@@ -7,7 +7,7 @@ use select::node::Node;
 use select::predicate::{Class, Name};
 use std::borrow::ToOwned;
 
-use crate::{Context, IO, env};
+use crate::{Context, env};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Ban {
@@ -63,7 +63,7 @@ impl Bans {
     }
 }
 
-fn load_bans(page: &str) -> IO<MultiMap<String, Ban>> {
+fn load_bans(page: &str) -> Result<MultiMap<String, Ban>, failure::Error> {
     let mut bans = MultiMap::new();
     let doc = Document::from_read(Client::new().get(page).send()?)?;
     for node in doc.find(Class("wiki-content-table")) {

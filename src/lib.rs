@@ -1,14 +1,15 @@
 #[macro_use] extern crate diesel;
 
 use irc::client::prelude::*;
-use irc::error::IrcError;
 use std::io;
 use std::io::BufRead;
 use std::iter::*;
-use std::time::SystemTime;
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use self::db::Db;
 use self::command::Commands;
+use self::wikidot::titles::TitlesDiff;
 
 mod command;
 mod db;
@@ -27,8 +28,6 @@ const CAPABILITIES: [Capability; 3] =
     , Capability::ExtendedJoin
     , Capability::MultiPrefix
     ];
-
-type IO<T> = Result<T, failure::Error>;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Api {
@@ -76,9 +75,20 @@ impl Context {
     }
 }
 
-pub fn run() -> Result<(), IrcError> {
+pub fn run() -> Result<(), failure::Error> {
     let mut cmds = Commands::new();
     let mut db = Db::new();
+    let (mut titles, recv) = TitlesDiff::new()?;
+    db.titles = titles.dup();
+    db.titles_r = Some(recv);
+
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(60));
+            titles.diff().unwrap();
+        }
+    });
+
     let mut reactor = IrcReactor::new()?;
     let client = reactor.prepare_client_and_connect(&env::irc())?;
     client.send_cap_req(&CAPABILITIES).expect("Error negotiating capabilities");
@@ -95,6 +105,16 @@ pub fn offline() -> Result<(), failure::Error> {
     let client = output::Offline;
     let mut cmds = Commands::new();
     let mut db = Db::new();
+    let (mut titles, recv) = TitlesDiff::new()?;
+    db.titles = titles.dup();
+    db.titles_r = Some(recv);
+    
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(60));
+            titles.diff().unwrap();
+        }
+    });
     
     println!("Awaiting input.");
     for line in io::stdin().lock().lines() {

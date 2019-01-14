@@ -55,11 +55,11 @@ fn find(nick: &str, channel: &str, mode: Mode, db: &Db) -> Option<String> {
     match mode {
         Mode::First => Some(format!(
             "I first saw {} {} ago, saying: {}", 
-            nick, util::since(seen.first_time).ok()?, seen.first
+            nick, util::ago(seen.first_time).ok()?, seen.first
         )),
         Mode::Regular => Some(format!(
             "I last saw {} {} ago, saying: {}",
-            nick, util::since(seen.latest_time).ok()?, seen.latest
+            nick, util::ago(seen.latest_time).ok()?, seen.latest
         )),
         Mode::Total => Some(format!(
             "I have seen {} total message{} from {}.",
