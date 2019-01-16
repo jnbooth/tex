@@ -89,7 +89,7 @@ mod tests {
         let ctx = ctx_test();
         assert_eq!(
             search(&["-f", &ctx.nick], &ctx, &db_test()).ok().unwrap(), 
-            format!("I first saw {} 0s ago, saying: first", ctx.nick)
+            format!("I first saw {} a few seconds ago, saying: first", ctx.nick)
         );
     }
 
@@ -98,7 +98,7 @@ mod tests {
         let ctx = ctx_test();
         assert_eq!(
             search(&[&ctx.nick], &ctx, &db_test()).ok().unwrap(), 
-            format!("I last saw {} 0s ago, saying: latest", ctx.nick)
+            format!("I last saw {} a few seconds ago, saying: latest", ctx.nick)
         );
     }
 

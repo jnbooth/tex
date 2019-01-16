@@ -101,6 +101,14 @@ impl Db {
                         if v == "[ACCESS DENIED]" {
                             self.titles.remove(&k);
                         } else {
+                            #[cfg(not(test))]
+                            let title = format!("{}: {}", k.to_uppercase(), v);
+                            #[cfg(not(test))] log(diesel
+                                ::update(page::table
+                                    .filter(page::fullname.eq(&k))
+                                    .filter(page::title.ne(&title))
+                                ).set(page::title.eq(&title))
+                                .execute(&self.conn));
                             self.titles.insert(k, v);
                         }
                     }
@@ -118,7 +126,7 @@ impl Db {
                     Ok((k, false))    => deleted.push(k)
                 }
             }
-            
+
         }
     }
 
@@ -147,19 +155,6 @@ impl Db {
     #[cfg(test)]
     pub fn reload(&mut self) -> QueryResult<()> {
         Ok(())
-    }
-
-    pub fn with_title(&self, s: &str) -> String {
-        match self.titles.get(s) {
-            None => s.to_owned(),
-            Some(title) => {
-                if s.starts_with("scp-") {
-                  format!("{}: {}", s.to_uppercase(), title)
-                } else {
-                    title.to_owned()
-                }
-            }
-        }
     }
 
     pub fn auth(&self, nick: &str) -> i32 {
