@@ -61,7 +61,7 @@ fn add_reminder(message: &str, when: SystemTime, ctx: &Context, db: &mut Db) -> 
         message: message.to_owned()
     };
     #[cfg(not(test))] diesel
-        ::insert_into(reminder::table)
+        ::insert_into(db::reminder::table)
         .values(&reminder)
         .execute(&db.conn)?;
     db.reminders.insert(ctx.user.to_owned(), reminder);

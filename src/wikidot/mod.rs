@@ -1,23 +1,22 @@
-#![allow(dead_code)]
+use hashbrown::HashSet;
 use reqwest::Client;
 use reqwest::header::AUTHORIZATION;
 use select::document::Document;
 use xmlrpc::Value;
 
-use crate::env;
+use crate::{IO, env};
+use crate::db::Page;
 
-mod page;
 pub mod titles;
-
-use self::page::Page;
+pub mod pages;
 
 #[derive(Debug, Clone)]
 pub struct Wikidot {
-    ajax: String,
-    rpc:  String,
-    auth: String,
     pub root: String,
     pub site: String,
+    ajax:     String,
+    rpc:      String,
+    auth:     String
 }
 
 impl Wikidot {
@@ -43,19 +42,8 @@ impl Wikidot {
             .call(req)
     }
 
-    pub fn get(&self, articles: &Vec<String>, cli: &Client) -> Result<Vec<Page>, failure::Error> {
-        let pages = articles.into_iter().map(|x| Value::from(x.to_owned())).collect();
-        let res = self.xml_rpc(cli, "pages.get_meta", vec![
-            ("site",  Value::from(self.site.to_owned())),
-            ("pages", Value::Array(pages))
-        ])?;
-        let obj = res.as_struct().ok_or_else(||failure::err_msg("Invalid response"))?;
-        
-        Ok(obj.into_iter().filter_map(|(_, v)| Page::new(v)).collect())
-    }
-
     pub fn request_module(&self, module_name: &str, client: &Client, args: &[(&str, &str)]) 
-    -> Result<Document, failure::Error> {
+    -> IO<Document> {
         let mut full_args = args.to_owned();
         full_args.push(("moduleName", module_name));
         let res = client
@@ -68,31 +56,68 @@ impl Wikidot {
         )?;
         Ok(Document::from(body))
     }
-}
 
-fn parse_votes(val: &Value, article: &str) -> Option<i32> {
-    val
-        .as_struct()?
-        .get(article)?
-        .as_struct()?
-        .get("rating")?
-        .as_i32()
+    pub fn get(&self, articles: &Vec<String>, cli: &Client) -> Result<Vec<Page>, xmlrpc::Error> {
+        let pages = articles.into_iter().map(|x| Value::from(x.to_owned())).collect();
+        let res = self.xml_rpc(cli, "pages.get_meta", vec![
+            ("site",  Value::from(self.site.to_owned())),
+            ("pages", Value::Array(pages))
+        ])?;
+        Ok(res
+            .as_struct()
+            .expect("Invalid pages.get_meta response")
+            .into_iter()
+            .filter_map(|(_, v)| Page::new(v))
+            .collect()
+        )
+    }
+
+    pub fn list(&self, cli: &Client) -> Result<HashSet<String>, xmlrpc::Error> {
+        let res = self.xml_rpc(&cli, "pages.select", vec![
+            ("site",  Value::from(self.site.to_owned())),
+            ("parent", Value::from("-".to_owned())),
+            ("order", Value::from("created_at desc".to_owned()))
+        ])?;
+        Ok(res
+            .as_array()
+            .expect("Invalid pages.select response")
+            .into_iter()
+            .filter_map(Value::as_str)
+            .map(ToOwned::to_owned)
+            .collect()
+        )
+    }
+
+    pub fn rate(&self, title: &str, cli: &Client) -> Option<i32> {
+        let res = self.xml_rpc(&cli, "pages.get_meta", vec![
+            ("site",  Value::from(self.site.to_owned())),
+            ("pages", Value::Array(vec![Value::from(title.to_owned())]))
+        ]).ok()?;
+        let (_, page) = res.as_struct()?.iter().next()?;
+        Some(Page::new(page)?.rating)
+    }
+
+    pub fn walk<F>(&self, titles: &[String], cli: &Client, mut f: F) -> IO<()> 
+    where F: FnMut(&str, Page, Vec<String>) -> IO<()> {
+        for chunk in titles.chunks(10) {
+            let pages = chunk.into_iter().map(|x| Value::from(x.to_owned())).collect();
+            let res = self.xml_rpc(&cli, "pages.get_meta", vec![
+                ("site",  Value::from(self.site.to_owned())),
+                ("pages", Value::Array(pages))
+            ])?;
+            let obj = res.as_struct().ok_or_else(||failure::err_msg("Invalid response"))?;
+            for (k, v) in obj {
+                if let Some((pg, tags)) = Page::tagged(v) {
+                    f(k, pg, tags)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn get_body(json: &serde_json::Value) -> Option<&str> {
     json.as_object()?.get("body")?.as_str()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::util::own;
-
-    #[test] #[ignore]
-    fn test_rating() {
-        env::load();
-        println!("{:?}",
-            Wikidot::new().unwrap().get(&own(&["SCP-3191", "SCP-3209"]), &Client::new())
-        )
-    }
-}

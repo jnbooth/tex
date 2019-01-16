@@ -32,11 +32,12 @@ table! {
 }
 
 table! {
-    page (url) {
-        url -> Varchar,
-        name -> Varchar,
-        author -> Varchar,
-        votes -> Int4,
+    page (fullname) {
+        fullname -> Varchar,
+        created_at -> Timestamptz,
+        created_by -> Varchar,
+        rating -> Int4,
+        title -> Varchar,
     }
 }
 
@@ -71,6 +72,14 @@ table! {
 }
 
 table! {
+    tag (id) {
+        id -> Int4,
+        name -> Varchar,
+        page -> Varchar,
+    }
+}
+
+table! {
     tell (id) {
         id -> Int4,
         target -> Varchar,
@@ -97,6 +106,7 @@ allow_tables_to_appear_in_same_query!(
     reminder,
     seen,
     silence,
+    tag,
     tell,
     user,
 );

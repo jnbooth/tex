@@ -3,14 +3,6 @@ use failure::err_msg;
 use stash::Stash;
 use hashbrown::HashMap;
 
-use crate::{Context, env, wikidot};
-use crate::db;
-use crate::db::Db;
-use crate::error::*;
-use crate::output::Output;
-use crate::util::own;
-#[cfg(not(test))] use crate::db::schema::*;
-
 mod auth;
 mod choose;
 mod define;
@@ -29,6 +21,15 @@ mod seen;
 mod tell;
 mod wikipedia;
 mod zyn;
+
+#[cfg(not(test))] mod search;
+
+use crate::{Context, db, env};
+use crate::db::Db;
+use crate::error::*;
+use crate::output::Output;
+use crate::util::own;
+use crate::wikidot::Wikidot;
 
 trait Command<O: Output + 'static> {
     fn cmds(&self) -> Vec<String>;
@@ -72,11 +73,13 @@ impl<O: Output + 'static> Commands<O> {
             Err(e)    => println!("Error creating name command: {}", e),
             Ok(names) => x.store(names)
         }
-        if let Some(wiki) = wikidot::Wikidot::new() {
-            x.store(lastcreated::LastCreated::new(wiki));
+        if let Some(wiki) = Wikidot::new() {
+            x.store(lastcreated::LastCreated::new(wiki.clone()));
+            #[cfg(not(test))]
+            x.store(search::Search::new(wiki));
         }
         for &i in &[false, true] {
-            x.store(disable::Disable::new(i, x.canons.to_owned()));
+            x.store(disable::Disable::new(i, x.canons.clone()));
         }
         x.usages.insert("help".to_owned(), "<command>".to_owned());
         x.usages.insert("h".to_owned(), "<command>".to_owned());

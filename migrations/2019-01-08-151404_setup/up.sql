@@ -5,12 +5,6 @@ CREATE TABLE "memo" (
   "message" CHARACTER VARYING  NOT NULL,
   CONSTRAINT MemoContext UNIQUE ("channel", "user")
 );
-CREATE TABLE "page" (
-  "url"    CHARACTER VARYING  PRIMARY KEY,
-  "name"   CHARACTER VARYING  NOT NULL,
-  "author" CHARACTER VARYING  NOT NULL,
-  "votes"  INT  NOT NULL  DEFAULT 0
-);
 CREATE TABLE "reminder" (
   "id"      SERIAL  PRIMARY KEY,
   "user"    CHARACTER VARYING  NOT NULL,

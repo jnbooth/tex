@@ -5,7 +5,6 @@ use std::time::SystemTime;
 
 use super::*;
 use crate::util;
-use crate::wikidot::Wikidot;
 
 const LIMIT: u8 = 3;
 const TIMEZONE: i32 = 8 * 60 * 60;
@@ -53,7 +52,7 @@ impl LastCreated {
         let timestamp = val.find(Class("odate")).next()?.text();
         let ago = parse_time(&timestamp).ok()?;
         let mut title = a.text();
-        if let Some(more) = db.titles.get(&title) {
+        if let Some(more) = db.titles.get(&title.to_lowercase()) {
             if more != &title && more != "[ACCESS DENIED]" {
                 title.push_str(": ");
                 title.push_str(more);
@@ -66,5 +65,5 @@ impl LastCreated {
 fn parse_time(timestamp: &str) -> Outcome<String> {
     let naive = NaiveDateTime::parse_from_str(&timestamp, "%_d %b %Y %H:%M")?;
     let datetime: DateTime<FixedOffset> = DateTime::from_utc(naive, FixedOffset::west(TIMEZONE));
-    Ok(util::ago(SystemTime::from(datetime))?)
+    Ok(util::ago(SystemTime::from(datetime)))
 }

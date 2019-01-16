@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
-use hashbrown::HashMap;
+#[cfg(not(test))] use diesel::query_dsl::methods::LoadQuery;
+use hashbrown::{HashSet, HashMap};
 use multimap::MultiMap;
 use reqwest::Client;
 use std::borrow::ToOwned;
@@ -9,19 +10,19 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::TryRecvError::{Empty, Disconnected};
 use std::time::SystemTime;
 
-
 #[macro_use] mod model_macro;
 mod ban;
-pub mod model;
-pub mod schema;
+mod model;
+mod schema;
 
 use crate::logging;
 use crate::local::LocalMap;
-use crate::{Context, env, util};
+use crate::{Context, IO, env, util};
+use crate::wikidot::Wikidot;
 use self::ban::Bans;
 
 pub use self::model::*;
-#[cfg(not(test))] use self::schema::*;
+pub use self::schema::*;
 
 pub fn log<T>(res: QueryResult<T>) {
     if let Err(e) = res {
@@ -47,41 +48,25 @@ pub struct Db {
     pub tells:     MultiMap<String, Tell>,
     pub users:     HashMap<String, User>,
 
+    pub loaded:    HashSet<String>,
+    pub loaded_r:  Option<Receiver<(String, bool)>>,
     pub titles:    HashMap<String, String>,
-    pub titles_r:  Option<Receiver<(String, String)>>
+    pub titles_r:  Option<Receiver<(String, String)>>,
+
+    pub wiki:      Option<Wikidot>
 }
 
 impl Db {
     pub fn new() -> Self {
-        Self::establish_db().expect("Error loading database")
+        let mut db = Self::establish_db();
+        db.reload().expect("Error loading database");
+        db
     }
 
-    #[cfg(not(test))]
-    fn establish_db() -> QueryResult<Self> {
-        let conn = establish_connection();
-        let owner = env::opt("OWNER");
-        Ok(Db {
-            client:    Client::new(),
-            nick:      env::get("IRC_NICK").to_lowercase(),
-            owner_:    env::opt("OWNER").map(|x| x.to_lowercase()),
-            owner,
-            bans:      Bans::new(),
-            choices:   Vec::new(),
-            reminders: load_reminders(&conn)?,
-            silences:  load_silences(&conn)?,
-            tells:     load_tells(&conn)?,
-            users:     load_users(&conn)?,
-
-            titles:    HashMap::new(),
-            titles_r:  None,
-            conn
-        })
-    }
-    #[cfg(test)]
-    fn establish_db() -> QueryResult<Self> {
+    fn establish_db() -> Self {
         let owner = env::opt("OWNER");
         env::load();
-        Ok(Db {
+        Db {
             client:    Client::new(),
             nick:      env::get("IRC_NICK").to_lowercase(),
             owner_:    env::opt("OWNER").map(|x| x.to_lowercase()),
@@ -92,11 +77,18 @@ impl Db {
             silences:  LocalMap::new(),
             tells:     MultiMap::new(),
             users:     HashMap::new(),
-            seen:      LocalMap::new(),
 
+            loaded:    HashSet::new(),
             titles:    HashMap::new(),
-            titles_r:  None
-        })
+            loaded_r:  None,
+            titles_r:  None,
+            wiki:      Wikidot::new(),
+
+            #[cfg(not(test))]
+            conn:      establish_connection(),
+            #[cfg(test)]
+            seen:      LocalMap::new()
+        }
     }
 
     pub fn listen(&mut self) {
@@ -115,15 +107,41 @@ impl Db {
                 }
             }
         }
+        if let Some(loaded_r) = &self.loaded_r {
+            let mut added = Vec::new();
+            let mut deleted = Vec::new();
+            loop {
+                match loaded_r.try_recv() {
+                    Err(Empty)        => break,
+                    Err(Disconnected) => { self.titles_r = None; break },
+                    Ok((k, true))     => added.push(k),
+                    Ok((k, false))    => deleted.push(k)
+                }
+            }
+            
+        }
+    }
+
+    #[cfg(not(test))]
+    fn load<Frm, To, C, L, F>(&self, table: L, f: F) -> QueryResult<C>
+    where C: FromIterator<To>, L: LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
+        Ok(C::from_iter(table.load::<Frm>(&self.conn)?.into_iter().map::<To, F>(f)))
     }
 
     #[cfg(not(test))]
     pub fn reload(&mut self) -> QueryResult<()> {
-        self.reminders = load_reminders(&self.conn)?;
-        self.silences  = load_silences(&self.conn)?;
-        self.tells     = load_tells(&self.conn)?;
-        self.users     = load_users(&self.conn)?;
-        self.bans      = Bans::new();
+        self.bans = Bans::new();
+        self.loaded = HashSet::from_iter(
+            page::table.select(page::fullname).get_results(&self.conn)?.into_iter()
+        );
+        self.reminders = 
+            self.load(reminder::table, |x: DbReminder| (x.user.to_owned(), Reminder::from(x)))?;
+        self.silences = 
+            self.load(silence::table,  |x: DbSilence|  Silence::from(x))?;
+        self.tells = 
+            self.load(tell::table,     |x: DbTell|     (x.target.to_owned(), Tell::from(x)))?;
+        self.users = 
+            self.load(user::table,     |x: User|       (x.nick.to_owned(), x))?;
         Ok(())
     }
     #[cfg(test)]
@@ -131,6 +149,18 @@ impl Db {
         Ok(())
     }
 
+    pub fn with_title(&self, s: &str) -> String {
+        match self.titles.get(s) {
+            None => s.to_owned(),
+            Some(title) => {
+                if s.starts_with("scp-") {
+                  format!("{}: {}", s.to_uppercase(), title)
+                } else {
+                    title.to_owned()
+                }
+            }
+        }
+    }
 
     pub fn auth(&self, nick: &str) -> i32 {
         let user = nick.to_lowercase();
@@ -231,6 +261,60 @@ impl Db {
             .ok_or(diesel::result::Error::NotFound)?;
         Ok(res.to_owned())
     }
+
+    #[cfg(not(test))]
+    fn download_diff(&mut self, added: Vec<String>, deleted: Vec<String>) -> IO<()> {
+        if let Some(wiki) = &self.wiki {
+            for x in deleted {
+                diesel
+                    ::delete(page::table.filter(page::fullname.eq(&x)))
+                    .execute(&self.conn)?;
+                diesel
+                    ::delete(tag::table.filter(tag::page.eq(&x)))
+                    .execute(&self.conn)?;
+                self.loaded.remove(&x);
+            }
+            wiki.walk(&added, &self.client, |title, mut page, tags| {
+                if let Some(title) = self.titles.get(&page.fullname) {
+                    page.title.push_str(": ");
+                    page.title.push_str(title);
+                }
+                diesel
+                    ::insert_into(page::table)
+                    .values(&page)
+                    .on_conflict_do_nothing()
+                    .execute(&self.conn)?;
+                for tag in tags {
+                    diesel
+                        ::insert_into(tag::table)
+                        .values(Tag { name: tag, page: title.to_owned() })
+                        .execute(&self.conn)?;
+                }
+                Ok(())
+            })?;
+            for x in added {
+                self.loaded.insert(x);
+            }
+        }
+        Ok(())
+    }
+    #[cfg(test)]
+    fn download_diff(&mut self, _: Vec<String>, _: Vec<String>) -> IO<()> {
+        Ok(())
+    }
+
+
+    pub fn download(&mut self, titles: &HashSet<String>) -> IO<()> {
+        let added = titles
+            .difference(&self.loaded)
+            .map(ToOwned::to_owned)
+            .collect();
+        let deleted = self.loaded
+            .difference(&titles)
+            .map(ToOwned::to_owned)
+            .collect();
+        self.download_diff(added, deleted)
+    }
 }
 
 pub fn establish_connection() -> PgConnection {
@@ -238,40 +322,4 @@ pub fn establish_connection() -> PgConnection {
     let database_url = env::get("DATABASE_URL");
     PgConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}", database_url))
-}
-
-#[cfg(not(test))]
-fn load_reminders(conn: &PgConnection) -> QueryResult<MultiMap<String, Reminder>> {
-    Ok(MultiMap::from_iter(
-        reminder::table.load(conn)?
-            .into_iter()
-            .map(|x: DbReminder| (x.user.to_owned(), Reminder::from(x)))
-    ))
-}
-
-#[cfg(not(test))]
-fn load_tells(conn: &PgConnection) -> QueryResult<MultiMap<String, Tell>> {
-    Ok(MultiMap::from_iter(
-        tell::table.load(conn)?
-            .into_iter()
-            .map(|x: DbTell| (x.target.to_owned(), Tell::from(x)))
-    ))
-}
-
-#[cfg(not(test))]
-fn load_silences(conn: &PgConnection) -> QueryResult<LocalMap<Silence>> {
-    Ok(LocalMap::from_iter(
-        silence::table.load::<DbSilence>(conn)?
-            .into_iter()
-            .map(Silence::from)
-    ))
-}
-
-#[cfg(not(test))]
-fn load_users(conn: &PgConnection) -> QueryResult<HashMap<String, User>> {
-    Ok(HashMap::from_iter(
-        user::table.load(conn)?
-            .into_iter()
-            .map(|x: User| (x.nick.to_owned(), x))
-    ))
 }

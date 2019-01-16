@@ -119,17 +119,20 @@ fn run<O: Output>(cmds: &mut Commands<O>, message: &str, irc: &O, ctx: &Context,
         }
     } else {
         match cmds.run(&cmd, &args, irc, ctx, db) {
-            Err(IrcErr(e))     => Err(e),
-            Ok(())             => Ok(()),
-            Err(Unknown)       => Ok(()),
-            Err(InvalidArgs)   => irc.reply(ctx, &cmds.usage(&cmd)),
-            Err(NoResults)     => irc.reply(ctx, NO_RESULTS),
-            Err(Ambiguous(xs)) => {
+            Err(IrcErr(e))   => Err(e),
+            Ok(())           => Ok(()),
+            Err(Unknown)     => Ok(()),
+            Err(InvalidArgs) => irc.reply(ctx, &cmds.usage(&cmd)),
+            Err(NoResults)   => irc.reply(ctx, NO_RESULTS),
+            Err(Ambiguous(size, xs)) => {
                 db.choices.clear();
                 for x in &xs {
                     db.choices.push(format!("{} {}", cmd, x));
                 }
-                irc.reply(ctx, &suggest(&xs))
+                match size {
+                    0 => irc.reply(ctx, &suggest(&xs)),
+                    _ => irc.reply(ctx, &format!("{} ({} total)", suggest(&xs), size))
+                }
             },
             Err(Unauthorized) => {
                 log(WARN, &format!("{} used an unauthorized command: {}", ctx.nick, cmd)); 

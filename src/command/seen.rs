@@ -5,7 +5,7 @@ pub struct Seen;
 
 impl<O: Output + 'static> Command<O> for Seen {
     fn cmds(&self) -> Vec<String> {
-        abbrev("seen")
+        own(&["seen", "se"])
     }
     fn usage(&self) -> String { "[#<channel>] [-f|-t] <user>".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 0 }
@@ -55,11 +55,11 @@ fn find(nick: &str, channel: &str, mode: Mode, db: &Db) -> Option<String> {
     match mode {
         Mode::First => Some(format!(
             "I first saw {} {} ago, saying: {}", 
-            nick, util::ago(seen.first_time).ok()?, seen.first
+            nick, util::ago(seen.first_time), seen.first
         )),
         Mode::Regular => Some(format!(
             "I last saw {} {} ago, saying: {}",
-            nick, util::ago(seen.latest_time).ok()?, seen.latest
+            nick, util::ago(seen.latest_time), seen.latest
         )),
         Mode::Total => Some(format!(
             "I have seen {} total message{} from {}.",

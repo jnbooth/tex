@@ -1,10 +1,15 @@
 extern crate tex;
 
 fn main() {
-    tex::env::load();
+    tex::load();
     match std::env::args().nth(1) {
-        Some(ref s) if s == "--offline" || s == "-o" => println!("{:?}", tex::offline()),
-        Some(s) => println!("Unknown flag {}", s),
-        _ => println!("{:?}", tex::run()),
+        None => println!("{:?}", tex::run()),
+        Some(s) => match s.as_str() {
+            "--offline"  => println!("{:?}", tex::offline()),
+            "-o"         => println!("{:?}", tex::offline()),
+            "--download" => println!("{:?}", tex::download()),
+            "-d"         => println!("{:?}", tex::download()),
+            _            => println!("Unknown flag {}", s)
+        }
     };
 }

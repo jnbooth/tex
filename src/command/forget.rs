@@ -26,19 +26,19 @@ fn delete_user(nick: &str, db: &mut Db) -> QueryResult<bool> {
     let user = nick.to_lowercase();
     #[cfg(not(test))] {
         diesel
-            ::delete(user::table.filter(user::nick.eq(&user)))
+            ::delete(db::user::table.filter(db::user::nick.eq(&user)))
             .execute(&db.conn)?;
         diesel
-            ::delete(db::schema::memo::table.filter(db::schema::memo::user.eq(&user)))
+            ::delete(db::memo::table.filter(db::memo::user.eq(&user)))
             .execute(&db.conn)?;
         diesel
-            ::delete(db::schema::seen::table.filter(db::schema::seen::user.eq(&user)))
+            ::delete(db::seen::table.filter(db::seen::user.eq(&user)))
             .execute(&db.conn)?;
         diesel
-            ::delete(db::schema::tell::table.filter(db::schema::tell::target.eq(&user)))
+            ::delete(db::tell::table.filter(db::tell::target.eq(&user)))
             .execute(&db.conn)?;
         diesel
-            ::delete(db::schema::tell::table.filter(db::schema::tell::sender.eq(&user)))
+            ::delete(db::tell::table.filter(db::tell::sender.eq(&user)))
             .execute(&db.conn)?;
     }
     let removed = db.users.remove(&user);

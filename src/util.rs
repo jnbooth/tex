@@ -1,9 +1,8 @@
-use core::hash::Hash;
-use multimap::MultiMap;
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use percent_encoding::utf8_percent_encode;
 use std::iter::*;
 use std::string::ToString;
-use std::time::{Duration, SystemTime, SystemTimeError};
+use std::time::SystemTime;
 
 const CHARACTER_LIMIT: usize = 300;
 
@@ -28,36 +27,76 @@ pub fn trim(s: &str) -> String {
     content
 }
 
-pub fn ago(when: SystemTime) -> Result<String, SystemTimeError> {
-    let dur = chrono::Duration::seconds(when.elapsed()?.as_secs() as i64);
-    let weeks = dur.num_weeks();
-    if weeks > 52 {
-        Ok(format!("{} years", weeks / 52))
-    } else if weeks > 1 {
-        Ok(format!("{} weeks", weeks))
-    } else if dur.num_days() > 1 {
-        Ok(format!("{} days", dur.num_days()))
-    } else if dur.num_hours() > 1 {
-        Ok(format!("{} hours", dur.num_hours()))
-    } else if dur.num_minutes() > 1 {
-        Ok(format!("{} minutes", dur.num_minutes()))
-    } else if dur.num_seconds() > 1 {
-        Ok(format!("{} seconds", dur.num_seconds()))
+pub fn rating(i: i32) -> String {
+    if i > 0 {
+        format!("+{}", i)
+    } else if i < 0 {
+        format!("-{}", i)
     } else {
-        Ok("now".to_owned())
+        format!("{}", i)
     }
 }
 
-pub fn since(when: SystemTime) -> Result<String, SystemTimeError> {
-    let secs = when.elapsed()?.as_secs();
-    Ok(humantime::format_duration(
-        Duration::from_secs(if secs < 60 { secs } else { secs / 60 * 60 })
-    ).to_string())
+pub fn parse_date(s: &str) -> Option<DateTime<Utc>> {
+    let mut fragments = if s.contains('-') {
+        s.split('-')
+    } else {
+        s.split('/')
+    };
+    let year = fragments.next()?.parse().ok()?;
+    let month = if let Some(frag) = fragments.next() {
+        frag.parse().ok()?
+    } else {
+        0
+    };
+    let day = if let Some(frag) = fragments.next() {
+        frag.parse().ok()?
+    } else {
+        0
+    };
+    let naive = NaiveDate::from_ymd_opt(year, month, day)?.and_hms(0, 0, 0);
+    Some(DateTime::from_utc(naive, Utc))
+}
+
+pub trait DurationAgo {
+    fn duration_ago(self) -> Duration;
+}
+impl DurationAgo for SystemTime {
+    fn duration_ago(self) -> Duration {
+        match self.elapsed() {
+            Err(_)  => Duration::zero(),
+            Ok(dur) => Duration::seconds(dur.as_secs() as i64)
+        }
+    }
+}
+impl DurationAgo for DateTime<Utc> {
+    fn duration_ago(self) -> Duration {
+        Utc::now().signed_duration_since(self)
+    }
+}
+
+pub fn ago<T: DurationAgo>(when: T) -> String {
+    let dur = when.duration_ago();
+    if dur.num_days() > 365 {
+        format!("{} years", dur.num_days() / 365)
+    } else if dur.num_weeks() > 1 {
+        format!("{} weeks", dur.num_weeks())
+    } else if dur.num_days() > 1 {
+        format!("{} days", dur.num_days())
+    } else if dur.num_hours() > 1 {
+        format!("{} hours", dur.num_hours())
+    } else if dur.num_minutes() > 1 {
+        format!("{} minutes", dur.num_minutes())
+    } else if dur.num_seconds() > 1 {
+        format!("{} seconds", dur.num_seconds())
+    } else {
+        "a few seconds".to_owned()
+    }
 }
 
 pub fn show_time(when: SystemTime) -> String {
     let time = humantime::format_rfc3339_seconds(
-        when - Duration::from_secs(60 * 60 * 8)
+        when - std::time::Duration::from_secs(60 * 60 * 8)
     ).to_string();
     time[..time.len()-4].rsplit('T').collect::<Vec<&str>>().join(" ").replace("-", "/")
 }
@@ -95,6 +134,7 @@ pub fn pop_filter<F, T>(vec: &mut Vec<T>, filter: F) -> Option<T> where F: Fn(&T
     None
 }
 
+/*
 pub fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: &K, v: &V) -> bool {
     if let Some(vec) = map.get_vec_mut(k) {
         let mut i = 0;
@@ -109,6 +149,14 @@ pub fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: &K, v: &V)
     }
     false
 }
+
+pub fn since(when: SystemTime) -> Result<String, SystemTimeError> {
+    let secs = when.elapsed()?.as_secs();
+    Ok(humantime::format_duration(
+        Duration::from_secs(if secs < 60 { secs } else { secs / 60 * 60 })
+    ).to_string())
+}
+*/
 
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

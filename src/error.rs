@@ -11,7 +11,7 @@ pub enum Error {
     InvalidArgs,
     NoResults,
     ParseErr(failure::Error),
-    Ambiguous(Vec<String>),
+    Ambiguous(i64, Vec<String>),
     IrcErr(IrcError),
     Throw(failure::Error)
 }
@@ -28,6 +28,11 @@ impl From<reqwest::Error> for Error {
 impl From<std::io::Error> for Error {
     fn from(_: std::io::Error) -> Self {
         NoResults
+    }
+}
+impl From<getopts::Fail> for Error {
+    fn from(_: getopts::Fail) -> Self {
+        InvalidArgs
     }
 }
 impl From<diesel::result::Error> for Error {

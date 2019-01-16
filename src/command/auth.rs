@@ -34,11 +34,11 @@ pub fn add_user(nick: &str, auth: i32, db: &mut Db) -> QueryResult<()> {
             pronouns: db.users.get(&nick.to_lowercase()).and_then(|x| x.pronouns.to_owned())
         };
         #[cfg(not(test))] diesel
-            ::insert_into(user::table)
+            ::insert_into(db::user::table)
             .values(&obj)
-            .on_conflict(user::nick)
+            .on_conflict(db::user::nick)
             .do_update()
-            .set(user::auth.eq(auth))
+            .set(db::user::auth.eq(auth))
             .execute(&db.conn)?;
         db.users.insert(nick.to_lowercase(), obj);
         Ok(())

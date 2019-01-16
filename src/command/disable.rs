@@ -42,14 +42,14 @@ impl Disable {
         if self.enable {
             db.silences.remove(&ctx.channel, &cmd);
             #[cfg(not(test))] diesel
-                ::delete(silence::table
-                    .filter(silence::channel.eq(&ctx.channel))
-                    .filter(silence::command.eq(&cmd))
+                ::delete(db::silence::table
+                    .filter(db::silence::channel.eq(&ctx.channel))
+                    .filter(db::silence::command.eq(&cmd))
                 ).execute(&db.conn)?;
         } else {
             let silence = db::Silence { channel: ctx.channel.to_owned(), command: cmd.to_owned() };
             #[cfg(not(test))] diesel
-                ::insert_into(silence::table)
+                ::insert_into(db::silence::table)
                 .values(&silence)
                 .on_conflict_do_nothing()
                 .execute(&db.conn)?;

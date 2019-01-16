@@ -66,7 +66,7 @@ impl Wikipedia {
         let top = extract.split('\n').next()?;
         if top.ends_with(":") && top.contains("refer") {
             if let Some(disambig) = parse_disambig(title, result) {
-                return Some(Err(Ambiguous(disambig)))
+                return Some(Err(Ambiguous(0, disambig)))
             }
         }
         Some( Ok(
@@ -116,7 +116,7 @@ fn parse_disambig(title_up: &str, json: &Map<String, Value>) -> Option<Vec<Strin
         .as_array()?
         .into_iter()
         .filter_map(parse_link);
-    let mut verbatim = links.to_owned()
+    let mut verbatim = links.clone()
         .filter(|x| x.to_lowercase().starts_with(&title))
         .peekable();
     if verbatim.peek().is_some() {

@@ -2,6 +2,7 @@ use rand::distributions::{Distribution, WeightedError, WeightedIndex};
 use rand::Rng;
 
 use super::*;
+use crate::IO;
 use crate::util::Gender;
 
 use crate::db::establish_connection;
@@ -50,13 +51,12 @@ impl<O: Output + 'static> Command<O> for Name {
 }
 
 impl Name {
-    pub fn new() -> Result<Self, failure::Error> {
-        use crate::db::schema::*;
+    pub fn new() -> IO<Self> {
         let conn = establish_connection();
         Ok(Name {
-            female: NameList::new(&name_female::table.load(&conn)?)?,
-            male:   NameList::new(&name_male::table.load(&conn)?)?,
-            last:   NameList::new(&name_last::table.load(&conn)?)?
+            female: NameList::new(&db::name_female::table.load(&conn)?)?,
+            male:   NameList::new(&db::name_male::table.load(&conn)?)?,
+            last:   NameList::new(&db::name_last::table.load(&conn)?)?
         })
     }
 

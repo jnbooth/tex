@@ -100,9 +100,9 @@ impl Memo {
     #[cfg(not(test))]
     pub fn get(&self, user: &str, ctx: &Context, db: &Db) -> Outcome<String> {
         println!("{}", user);
-        Ok(db::schema::memo::table
-            .filter(db::schema::memo::channel.eq(&ctx.channel))
-            .filter(db::schema::memo::user.eq(user))
+        Ok(db::memo::table
+            .filter(db::memo::channel.eq(&ctx.channel))
+            .filter(db::memo::user.eq(user))
             .first::<db::DbMemo>(&db.conn)
             .map(|x| x.message)?
         )
@@ -111,10 +111,10 @@ impl Memo {
     #[cfg(not(test))]
     pub fn remove(&mut self, user: &str, ctx: &Context, db: &Db) -> Outcome<String> {
         Ok(diesel
-            ::delete(db::schema::memo::table
-                .filter(db::schema::memo::channel.eq(&ctx.channel))
-                .filter(db::schema::memo::user.eq(user))
-            ).returning(db::schema::memo::message)
+            ::delete(db::memo::table
+                .filter(db::memo::channel.eq(&ctx.channel))
+                .filter(db::memo::user.eq(user))
+            ).returning(db::memo::message)
             .get_result(&db.conn)?
         )
     }
@@ -127,11 +127,11 @@ impl Memo {
             message: message.to_owned()
         };
         diesel
-            ::insert_into(db::schema::memo::table)
+            ::insert_into(db::memo::table)
             .values(&memo)
-            .on_conflict((db::schema::memo::channel, db::schema::memo::user))
+            .on_conflict((db::memo::channel, db::memo::user))
             .do_update()
-            .set(db::schema::memo::message.eq(message))
+            .set(db::memo::message.eq(message))
             .execute(&db.conn)?;
         Ok(())
     }

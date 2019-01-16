@@ -5,6 +5,8 @@ use select::node::Node;
 use select::predicate::{Class, Name, Predicate, Text};
 use std::sync::mpsc::{Receiver, Sender, channel};
 
+use crate::IO;
+
 pub struct TitlesDiff {
     client: Client,
     sender: Sender<(String, String)>,
@@ -12,7 +14,7 @@ pub struct TitlesDiff {
 }
 
 impl TitlesDiff {
-    pub fn new() -> Result<(TitlesDiff, Receiver<(String, String)>), failure::Error> {
+    pub fn new() -> IO<(TitlesDiff, Receiver<(String, String)>)> {
         let (sender, receiver) = channel();
         let client = Client::new();
         Ok((TitlesDiff {
@@ -32,7 +34,7 @@ impl TitlesDiff {
         map
     }
 
-    pub fn diff(&mut self) -> Result<(), failure::Error> {
+    pub fn diff(&mut self) -> IO<()> {
         let changed = record_titles(&self.client)?;
         for (k, v) in changed {
             if self.titles.insert(k.to_owned(), v.to_owned()).is_none() {
@@ -56,7 +58,7 @@ fn parse_title(node: &Node) -> Option<(String, String)> {
 }
 
 /// Requests names for all articles from the mainlist.
-fn record_titles(cli: &Client) -> Result<HashMap<String, String>, failure::Error> {
+fn record_titles(cli: &Client) -> IO<HashMap<String, String>> {
     let mut titles = HashMap::new();
     let mut pages: Vec<String> = 
         (2..6)
@@ -68,8 +70,8 @@ fn record_titles(cli: &Client) -> Result<HashMap<String, String>, failure::Error
         let res = cli.get(&page).send()?;
         let doc = Document::from_read(res)?;
         for node in doc.find(Class("series").descendant(Name("li"))) {
-            if let Some((num, title)) = parse_title(&node) {
-                titles.insert(num, title);
+            if let Some((k, v)) = parse_title(&node) {
+                titles.insert(k.to_lowercase(), v);
             }
         }
     }

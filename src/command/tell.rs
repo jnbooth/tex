@@ -29,7 +29,7 @@ fn add_tell(message: &str, target_nick: &str, ctx: &Context, db: &mut Db) -> Que
         message: message.to_owned()
     };
     #[cfg(not(test))] diesel
-        ::insert_into(db::schema::tell::table)
+        ::insert_into(db::tell::table)
         .values(&tell)
         .execute(&db.conn)?;
     db.tells.insert(target, tell);
