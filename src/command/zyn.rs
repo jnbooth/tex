@@ -12,6 +12,7 @@ impl<O: Output + 'static> Command<O> for Zyn {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, _: &[&str], irc: &O, ctx: &Context, _: &mut Db) -> Outcome<()> {
-        Ok(irc.reply(ctx, "Marp.")?)
+        irc.reply(ctx, "Marp.")?;
+        Ok(())
     }
 }

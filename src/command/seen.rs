@@ -13,7 +13,8 @@ impl<O: Output + 'static> Command<O> for Seen {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        Ok(irc.reply(ctx, &search(args, ctx,  db)?)?)
+        irc.reply(ctx, &search(args, ctx,  db)?)?;
+        Ok(())
     }
 }
 
@@ -37,20 +38,20 @@ pub fn mode(s: &str) -> Option<Mode> {
 
 fn search(args_im: &[&str], ctx: &Context, db: &Db) -> Outcome<String> {
     let mut args = args_im.to_owned();
-    let mode = match util::pop_filter(&mut args, |x| x.starts_with("-")) {
+    let mode = match util::pop_filter(&mut args, |x| x.starts_with('-')) {
         None       => Mode::Regular,
         Some(flag) => mode(flag).ok_or(InvalidArgs)?
     };
-    let channel = util::pop_filter(&mut args, |x| x.starts_with("#"))
+    let channel = util::pop_filter(&mut args, |x| x.starts_with('#'))
         .map(ToOwned::to_owned)
-        .unwrap_or(ctx.channel.to_owned());
+        .unwrap_or_else(||ctx.channel.to_owned());
     match args.as_slice() {
-        [nick] => find(&nick, &channel, mode, db).ok_or(NoResults),
+        [nick] => find(&nick, &channel, &mode, db).ok_or(NoResults),
         _      => Err(InvalidArgs)
     }
 }
 
-fn find(nick: &str, channel: &str, mode: Mode, db: &Db) -> Option<String> {
+fn find(nick: &str, channel: &str, mode: &Mode, db: &Db) -> Option<String> {
     let seen = db.get_seen(channel, nick).ok()?;
     match mode {
         Mode::First => Some(format!(

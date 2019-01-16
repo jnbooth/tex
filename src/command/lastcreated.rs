@@ -32,7 +32,7 @@ impl<O: Output + 'static> Command<O> for LastCreated {
 
 impl LastCreated {
     pub fn new(wiki: Wikidot) -> Self {
-        LastCreated { wiki }
+        Self { wiki }
     }
 
     fn last_created(&self, db: &Db) -> Outcome<Vec<String>> {

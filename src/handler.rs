@@ -18,7 +18,7 @@ pub fn handle<O: Output>(message: Message, cmds: &mut Commands<O>, irc: &O, db: 
 -> Result<(), IrcError> {
     db.listen();
     let text = message.to_string();
-    match Context::new(db, message.to_owned()) {
+    match Context::build(db, message.to_owned()) {
         None      => print!("{}", text),
         Some(ctx) => {
             match message.command {
@@ -82,17 +82,15 @@ fn suggest(suggestions: &[String]) -> String {
         NO_RESULTS.to_owned()
     } else {
         let mut s = "Did you mean:".to_owned();
-        let mut i = 0;
-        for suggest in suggestions {
-            i += 1;
+        for (i, suggest) in suggestions.into_iter().enumerate() {
             if s.len() + suggest.len() + 7 > CHARACTER_LIMIT {
                 return s.to_owned()
             }
-            if i > 1 {
+            if i > 0 {
                 s.push_str(",");
             }
             s.push_str(" (");
-            s.push_str(&i.to_string());
+            s.push_str(&(i-1).to_string());
             s.push_str(") ");
             s.push_str(suggest);
         }
@@ -119,7 +117,7 @@ fn run<O: Output>(cmds: &mut Commands<O>, message: &str, irc: &O, ctx: &Context,
         }
     } else {
         match cmds.run(&cmd, &args, irc, ctx, db) {
-            Err(IrcErr(e))   => Err(e),
+            Err(IrcErr(e))   => Err(*e),
             Ok(())           => Ok(()),
             Err(Unknown)     => Ok(()),
             Err(InvalidArgs) => irc.reply(ctx, &cmds.usage(&cmd)),

@@ -12,7 +12,7 @@ pub enum Error {
     NoResults,
     ParseErr(failure::Error),
     Ambiguous(i64, Vec<String>),
-    IrcErr(IrcError),
+    IrcErr(Box<IrcError>),
     Throw(failure::Error)
 }
 impl From<std::num::ParseIntError> for Error {
@@ -56,7 +56,7 @@ impl From<chrono::format::ParseError> for Error {
 }
 impl From<IrcError> for Error {
     fn from(e: IrcError) -> Self {
-        IrcErr(e)
+        IrcErr(Box::new(e))
     }
 }
 impl From<std::time::SystemTimeError> for Error {

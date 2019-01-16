@@ -18,13 +18,14 @@ impl<O: Output + 'static> Command<O> for Google {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        Ok(irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?)
+        irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?;
+        Ok(())
     }
 }
 
 impl Google {
-    pub fn new(img: bool) -> Option<Self> {
-        Some(Google {
+    pub fn build(img: bool) -> Option<Self> {
+        Some(Self {
             api: env::api("GOOGLE", "CUSTOMENGINE", "KEY")?,
             img
         })
@@ -78,7 +79,7 @@ mod test {
 
     fn new(img: bool) -> Google {
         env::load();
-        Google::new(img).expect("Error initializing Google API")
+        Google::build(img).expect("Error initializing Google API")
     }
 
     #[test]

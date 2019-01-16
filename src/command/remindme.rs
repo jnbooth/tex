@@ -20,13 +20,14 @@ impl<O: Output + 'static> Command<O> for Remindme {
         let offset = self.parse_offset(&args[0]).ok_or(InvalidArgs)?;
         let when = SystemTime::now() + offset;
         add_reminder(&args[1..].join(" "), when, ctx, db)?;
-        Ok(irc.action(ctx, &format!("writes down {}'s reminder.", &ctx.nick))?)
+        irc.action(ctx, &format!("writes down {}'s reminder.", &ctx.nick))?;
+        Ok(())
     }
 }
 
 impl Remindme {
     pub fn new() -> Self {
-        Remindme { offset: Regex::new("\\d+").expect("Offset regex failed to compile") }
+        Self { offset: Regex::new("\\d+").expect("Offset regex failed to compile") }
     }  
 
     pub fn parse_offset(&self, s: &str) -> Option<Duration> {
@@ -46,7 +47,7 @@ impl Remindme {
 }
 
 fn yield_offset(d: u32, h: u32, m: u32) -> Option<Duration> {
-    Some(Duration::from_secs(60 * (m + 60 * (h + 24 * d)) as u64))
+    Some(Duration::from_secs(u64::from(60 * (m + 60 * (h + 24 * d)))))
 }
 
 fn next<'r, 't>(groups: &mut regex::Matches<'r, 't>) -> Option<u32> {
@@ -57,7 +58,7 @@ fn next<'r, 't>(groups: &mut regex::Matches<'r, 't>) -> Option<u32> {
 fn add_reminder(message: &str, when: SystemTime, ctx: &Context, db: &mut Db) -> QueryResult<()> {
     let reminder = db::Reminder {
         user:    ctx.user.to_owned(),
-        when:    when,
+        when,
         message: message.to_owned()
     };
     #[cfg(not(test))] diesel

@@ -24,16 +24,19 @@ impl<O: Output + 'static> Command<O> for Roll {
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, _: &mut Db) -> Outcome<()> {
         let content = args.join(" ");
         match self.throw(&content) {
-            Ok(roll)       => Ok(irc.reply(ctx, &format!("{} (rolled {})", roll, content))?),
             Err(NoResults) => Err(InvalidArgs),
-            Err(err)       => Err(err)
+            Err(err)       => Err(err),
+            Ok(roll)       => { 
+                irc.reply(ctx, &format!("{} (rolled {})", roll, content))?; 
+                Ok(()) 
+            }
         }
     }
 }
 
 impl Roll {
     pub fn new() -> Self {
-        Roll { 
+        Self { 
             dice: Regex::new("\\s*(\\+|-)\\s*").expect("Dice regex failed to compile"),
             rng:  rand::thread_rng() 
         }
@@ -64,7 +67,7 @@ impl Roll {
                 Some((before, after)) => {
                     let amount: i16 = if before.is_empty() { 1 } else { before.parse()? };
                     let mut suffix = after.to_owned();
-                    let signum = amount.signum() as i64;
+                    let signum = i64::from(amount.signum());
                     let (cmp, threshold) = if let Some(i) = suffix.find('>') {
                         (1, suffix.split_off(i)[1..].parse()?)
                     } else if let Some(i) = suffix.find('<') {
@@ -72,7 +75,7 @@ impl Roll {
                     } else {
                         (0, 0)
                     };
-                    let explode = if suffix.ends_with("!") {
+                    let explode = if suffix.ends_with('!') {
                         suffix.pop();
                         true
                     } else {
@@ -86,7 +89,7 @@ impl Roll {
                         _   => (1, suffix.parse()?)
                     };
                     if min == max {
-                        score += amount as i64;
+                        score += i64::from(amount);
                     } else if min < max {
                         for _ in 0..amount.abs() {
                             score += signum * self.roll(min, max, explode, cmp, threshold);

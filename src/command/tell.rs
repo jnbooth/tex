@@ -16,7 +16,8 @@ impl<O: Output + 'static> Command<O> for Tell {
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
         let (nick, msg) = args.split_first().ok_or(InvalidArgs)?;
         add_tell(&msg.join(" "), nick, ctx, db)?;
-        Ok(irc.action(ctx, &format!("writes down {}'s message for {}.", &ctx.nick, nick))?)
+        irc.action(ctx, &format!("writes down {}'s message for {}.", &ctx.nick, nick))?;
+        Ok(())
     }
 }
 

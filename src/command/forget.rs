@@ -15,10 +15,11 @@ impl<O: Output + 'static> Command<O> for Forget {
         let nick = args.get(0).ok_or(InvalidArgs)?;
         if ctx.auth > db.auth(&nick) {
             delete_user(&nick, db)?;
-            Ok(irc.action(ctx, &format!("forgets {}.", nick))?)
+            irc.action(ctx, &format!("forgets {}.", nick))?;
         } else {
-            Ok(irc.reply(ctx, "Your authorization rank is not high enough to do that.")?)
+            irc.reply(ctx, "Your authorization rank is not high enough to do that.")?;
         }
+        Ok(())
     }
 }
 

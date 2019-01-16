@@ -12,6 +12,7 @@ impl<O: Output + 'static> Command<O> for Quit {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, _: &[&str], irc: &O, _: &Context, _: &mut Db) -> Outcome<()> {
-        Ok(irc.quit("Shutting down, bleep bloop.")?)
+        irc.quit("Shutting down, bleep bloop.")?;
+        Ok(())
     }
 }

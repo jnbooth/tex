@@ -13,6 +13,7 @@ impl<O: Output + 'static> Command<O> for Reload {
 
     fn run(&mut self, _: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
         db.reload()?;
-        Ok(irc.action(ctx, "reloads its database.")?)
+        irc.action(ctx, "reloads its database.")?;
+        Ok(())
     }
 }

@@ -21,13 +21,14 @@ impl<O: Output + 'static> Command<O> for Define {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        Ok(irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?)
+        irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?;
+        Ok(())
     }
 }
 
 impl Define {
     pub fn new() -> Self {
-        Define {
+        Self {
             spaced: Regex::new(" \\([^()]+\\) ").expect("Spaced regex failed to compile"),
             parens: Regex::new("\\s*\\([^()]+\\)\\s*").expect("Parens regex failed to compile")
         }

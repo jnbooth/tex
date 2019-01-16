@@ -16,10 +16,11 @@ impl<O: Output + 'static> Command<O> for Auth {
         let nick = args.get(1).ok_or(InvalidArgs)?;
         if ctx.auth > auth && ctx.auth > db.auth(&nick) {
             add_user(&nick, auth, db)?;
-            Ok(irc.action(ctx, &format!("promotes {} to rank {}.", nick, auth))?)
+            irc.action(ctx, &format!("promotes {} to rank {}.", nick, auth))?;
         } else {
-            Ok(irc.reply(ctx, "Your authorization rank is not high enough to do that.")?)
+            irc.reply(ctx, "Your authorization rank is not high enough to do that.")?;
         }
+        Ok(())
     }
 }
 

@@ -10,8 +10,10 @@ pub trait Local {
 
 pub struct LocalMap<T: Local + Eq + Hash>(HashMap<String, HashMap<String, T>>);
 
+impl<T: Local + Eq + Hash> Default for LocalMap<T> { fn default() -> Self { Self::new() } }
+
 impl<T: Local + Eq + Hash> LocalMap<T> {
-    pub fn new() -> LocalMap<T> {
+    pub fn new() -> Self {
         LocalMap(HashMap::new())
     }
     pub fn with_capacity(capacity: usize) -> LocalMap<T> {

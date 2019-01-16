@@ -14,10 +14,10 @@ pub struct TitlesDiff {
 }
 
 impl TitlesDiff {
-    pub fn new() -> IO<(TitlesDiff, Receiver<(String, String)>)> {
+    pub fn build() -> IO<(Self, Receiver<(String, String)>)> {
         let (sender, receiver) = channel();
         let client = Client::new();
-        Ok((TitlesDiff {
+        Ok((Self {
             sender, 
             titles: record_titles(&client)?,
             client

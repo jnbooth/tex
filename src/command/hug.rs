@@ -12,6 +12,7 @@ impl<O: Output + 'static> Command<O> for Hug {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, _: &[&str], irc: &O, ctx: &Context, _: &mut Db) -> Outcome<()> {
-        Ok(irc.action(ctx, &format!("hugs {}.", ctx.nick))?)
+        irc.action(ctx, &format!("hugs {}.", ctx.nick))?;
+        Ok(())
     }
 }

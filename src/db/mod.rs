@@ -56,6 +56,8 @@ pub struct Db {
     pub wiki:      Option<Wikidot>
 }
 
+impl Default for Db { fn default() -> Self { Self::new() } }
+
 impl Db {
     pub fn new() -> Self {
         let mut db = Self::establish_db();
@@ -71,7 +73,7 @@ impl Db {
             nick:      env::get("IRC_NICK").to_lowercase(),
             owner_:    env::opt("OWNER").map(|x| x.to_lowercase()),
             owner,
-            bans:      Bans::new(),
+            bans:      Bans::build(),
             choices:   Vec::new(),
             reminders: MultiMap::new(),
             silences:  LocalMap::new(),
@@ -82,7 +84,7 @@ impl Db {
             titles:    HashMap::new(),
             loaded_r:  None,
             titles_r:  None,
-            wiki:      Wikidot::new(),
+            wiki:      Wikidot::build(),
 
             #[cfg(not(test))]
             conn:      establish_connection(),
@@ -138,18 +140,18 @@ impl Db {
 
     #[cfg(not(test))]
     pub fn reload(&mut self) -> QueryResult<()> {
-        self.bans = Bans::new();
+        self.bans = Bans::build();
         self.loaded = HashSet::from_iter(
             page::table.select(page::fullname).get_results(&self.conn)?.into_iter()
         );
-        self.reminders = 
-            self.load(reminder::table, |x: DbReminder| (x.user.to_owned(), Reminder::from(x)))?;
-        self.silences = 
-            self.load(silence::table,  |x: DbSilence|  Silence::from(x))?;
-        self.tells = 
-            self.load(tell::table,     |x: DbTell|     (x.target.to_owned(), Tell::from(x)))?;
-        self.users = 
-            self.load(user::table,     |x: User|       (x.nick.to_owned(), x))?;
+        self.silences = self.load::<DbSilence,_,_,_,_>
+            (silence::table, Silence::from)?;
+        self.reminders = self.load::<DbReminder,_,_,_,_>
+            (reminder::table, |x| (x.user.to_owned(), Reminder::from(x)))?;
+        self.tells = self.load::<DbTell,_,_,_,_>
+            (tell::table, |x| (x.target.to_owned(), Tell::from(x)))?;
+        self.users = self.load::<User,_,_,_,_>
+            (user::table, |x| (x.nick.to_owned(), x))?;
         Ok(())
     }
     #[cfg(test)]
@@ -315,6 +317,5 @@ impl Db {
 pub fn establish_connection() -> PgConnection {
     #[cfg(test)] env::load();
     let database_url = env::get("DATABASE_URL");
-    PgConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url))
+    PgConnection::establish(&database_url).expect("Error connecting to database")
 }

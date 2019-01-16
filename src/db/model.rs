@@ -91,11 +91,11 @@ pub struct Page {
 }
 
 impl Page {
-    pub fn new(val: &Value) -> Option<Page> {
-        Some(Page::tagged(val)?.0)
+    pub fn build(val: &Value) -> Option<Page> {
+        Some(Self::tagged(val)?.0)
     }
 
-    pub fn tagged(val: &Value) -> Option<(Page, Vec<String>)> {
+    pub fn tagged(val: &Value) -> Option<(Self, Vec<String>)> {
         let obj = val.as_struct()?;
         let created_at = DateTime
             ::parse_from_rfc3339(obj.get("created_at")?.as_str()?)
@@ -107,7 +107,7 @@ impl Page {
         let title = obj.get("title")?.as_str()?.to_owned();
         let tags = obj.get("tags")?.as_array()?.into_iter()
             .filter_map(Value::as_str).map(ToOwned::to_owned).collect();
-        Some((Page { created_at, created_by, fullname, rating, title }, tags))
+        Some((Self { created_at, created_by, fullname, rating, title }, tags))
     }
 }
 

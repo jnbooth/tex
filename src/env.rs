@@ -12,7 +12,9 @@ pub fn load() {
 
 pub fn get(var: &str) -> String {
     std::env::var(var)
-        .expect(&format!("{} must be defined in .env or as an environment variable", var))
+        .unwrap_or_else(|_|
+            panic!(format!("{} must be defined in .env or as an environment variable", var))
+        )
 }
 
 pub fn opt(var: &str) -> Option<String> {

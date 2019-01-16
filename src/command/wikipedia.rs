@@ -18,13 +18,14 @@ impl<O: Output + 'static> Command<O> for Wikipedia {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        Ok(irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?)
+        irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?;
+        Ok(())
     }
 }
 
 impl Wikipedia {
     pub fn new() -> Self {
-        Wikipedia {
+        Self {
             parens: Regex::new("\\s*\\([^()]+\\)").expect("Parens regex failed to compile")
         }
     }
@@ -64,7 +65,7 @@ impl Wikipedia {
         let extract = result.get("extract")?.as_str()?;
         
         let top = extract.split('\n').next()?;
-        if top.ends_with(":") && top.contains("refer") {
+        if top.ends_with(':') && top.contains("refer") {
             if let Some(disambig) = parse_disambig(title, result) {
                 return Some(Err(Ambiguous(0, disambig)))
             }
@@ -133,11 +134,11 @@ mod tests {
 
     #[test]
     fn test_page() {
-        assert_eq!(Wikipedia::new().search("Monty Oum", &mut reqwest::Client::new()).unwrap(), "https://en.wikipedia.org/wiki/Monty_Oum \x02Monty Oum\x02: Monyreak \"Monty\" Oum was an American web-based animator and writer. A self-taught animator, he scripted and produced several crossover fighting video series, drawing the attention of internet production company Rooster Teeth, who hired him. […]");
+        assert_eq!(Wikipedia::new().search("Monty Oum", &reqwest::Client::new()).unwrap(), "https://en.wikipedia.org/wiki/Monty_Oum \x02Monty Oum\x02: Monyreak \"Monty\" Oum was an American web-based animator and writer. A self-taught animator, he scripted and produced several crossover fighting video series, drawing the attention of internet production company Rooster Teeth, who hired him. […]");
     }
 
     #[test]
     fn test_ambig() {
-        assert!(Wikipedia::new().search("Rock", &mut reqwest::Client::new()).is_err());
+        assert!(Wikipedia::new().search("Rock", &reqwest::Client::new()).is_err());
     }
 }

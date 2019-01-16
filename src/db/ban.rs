@@ -1,5 +1,6 @@
 use chrono::NaiveDate;
 use chrono::offset::Local;
+use hashbrown::HashSet;
 use multimap::MultiMap;
 use reqwest::Client;
 use select::document::Document;
@@ -9,15 +10,15 @@ use std::borrow::ToOwned;
 
 use crate::{Context, IO, env};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Ban {
-    nicks:  Vec<String>,
-    hosts:  Vec<String>,
+    nicks:  HashSet<String>,
+    hosts:  HashSet<String>,
     status: Option<NaiveDate>,
     reason: String
 }
 impl Ban {
-    pub fn new(node: &Node) -> Option<Self> {
+    pub fn build(node: &Node) -> Option<Self> {
         let mut tds = node.find(Name("td"));
         let nicks = tds
             .next()?
@@ -34,7 +35,7 @@ impl Ban {
             .collect();
         let status = NaiveDate::parse_from_str(&tds.next()?.text(), "%m/%d/%Y").ok();
         let reason = tds.next()?.text();
-        Some(Ban { nicks, hosts, status, reason })
+        Some(Self { nicks, hosts, status, reason })
     }
     pub fn active(&self) -> bool {
         match self.status {
@@ -42,7 +43,7 @@ impl Ban {
             Some(t) => t >= Local::today().naive_local()
         }
     }
-    pub fn matches(&self, nick: &String, host: &String) -> bool {
+    pub fn matches(&self, nick: &str, host: &str) -> bool {
         self.nicks.contains(nick) || self.hosts.contains(host)
     }
 }
@@ -51,14 +52,13 @@ impl Ban {
 pub struct Bans(MultiMap<String, Ban>);
 
 impl Bans {
-    pub fn new() -> Option<Bans> {
+    pub fn build() -> Option<Bans> {
         Some(Bans(load_bans(&env::opt("BAN_PAGE")?).ok()?))
     }
     pub fn get_ban(&self, ctx: &Context) -> Option<String> {
         let bans = self.0.get_vec(&ctx.channel)?;
         let ban = bans.into_iter()
-            .filter(|x| x.active() && x.matches(&ctx.user, &ctx.host))
-            .next()?;
+            .find(|x| x.active() && x.matches(&ctx.user, &ctx.host))?;
         Some(ban.reason.to_owned())
     }
 }
@@ -71,7 +71,7 @@ fn load_bans(page: &str) -> IO<MultiMap<String, Ban>> {
             let chantext = title.text().to_owned();
             let chans = chantext.split(' ');
             for tr in node.find(Name("tr")) {
-                if let Some(ban) = Ban::new(&tr) {
+                if let Some(ban) = Ban::build(&tr) {
                     if ban.active() {
                         for chan in chans.clone() {
                             bans.insert(chan.to_owned(), ban.to_owned())

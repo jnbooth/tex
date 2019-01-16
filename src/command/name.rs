@@ -13,8 +13,8 @@ struct NameList {
     dist:  WeightedIndex<i32>
 }
 impl NameList {
-    pub fn new(names: &[db::Name]) -> Result<NameList, WeightedError> {
-        Ok(NameList { 
+    pub fn build(names: &[db::Name]) -> Result<NameList, WeightedError> {
+        Ok(Self { 
             names: names.into_iter().map(|x| x.name.to_owned()).collect(),
             dist:  WeightedIndex::new(names.into_iter().map(|x| x.frequency))?
         })
@@ -46,17 +46,18 @@ impl<O: Output + 'static> Command<O> for Name {
             ["-m"] => Ok(Gender::Male),
             _      => Err(InvalidArgs)
         }?;
-        Ok(irc.reply(ctx, &self.gen(gender))?)
+        irc.reply(ctx, &self.gen(gender))?;
+        Ok(())
     }
 }
 
 impl Name {
-    pub fn new() -> IO<Self> {
+    pub fn build() -> IO<Self> {
         let conn = establish_connection();
-        Ok(Name {
-            female: NameList::new(&db::name_female::table.load(&conn)?)?,
-            male:   NameList::new(&db::name_male::table.load(&conn)?)?,
-            last:   NameList::new(&db::name_last::table.load(&conn)?)?
+        Ok(Self {
+            female: NameList::build(&db::name_female::table.load(&conn)?)?,
+            male:   NameList::build(&db::name_male::table.load(&conn)?)?,
+            last:   NameList::build(&db::name_last::table.load(&conn)?)?
         })
     }
 
@@ -77,7 +78,7 @@ mod tests {
 
     #[test] #[ignore]
     fn test_gen() {
-        let names = Name::new().unwrap();
+        let names = Name::build().unwrap();
         println!("Female: {}", names.gen(Gender::Female));
         println!("Male:   {}", names.gen(Gender::Male));
         println!("Any:    {}", names.gen(Gender::Any));

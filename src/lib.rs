@@ -49,7 +49,7 @@ pub struct Context {
     pub time:    SystemTime
 }
 impl Context {
-    pub fn new(db: &Db, message: Message) -> Option<Context> {
+    pub fn build(db: &Db, message: Message) -> Option<Context> {
         let channel = message.response_target()?.to_lowercase();
         let prefix  = message.prefix?.to_owned();
         let nick    = prefix.split('!').next()?.to_owned();
@@ -58,7 +58,7 @@ impl Context {
         let auth    = db.auth(&user);
         let time    = SystemTime::now();
 
-        Some(Context { channel, nick, host, user, auth, time })
+        Some(Self { channel, nick, host, user, auth, time })
     }
     pub fn since(&self) -> String {
         match self.time.elapsed() {
@@ -82,7 +82,7 @@ impl Context {
 fn init() -> IO<Db> {
     let mut db = Db::new();
 
-    let (mut titles, titles_r) = TitlesDiff::new()?;
+    let (mut titles, titles_r) = TitlesDiff::build()?;
     db.titles = titles.dup();
     db.titles_r = Some(titles_r);
     thread::spawn(move || {
@@ -93,7 +93,7 @@ fn init() -> IO<Db> {
     });
 
     if let Some(wiki) = &db.wiki {
-        let (mut pages, pages_r) = PagesDiff::new(wiki.clone())?;
+        let (mut pages, pages_r) = PagesDiff::build(wiki.clone())?;
         db.loaded_r = Some(pages_r);
         db.download(&pages.dup())?;
         thread::spawn(move || {
@@ -140,7 +140,7 @@ pub fn offline() -> IO<()> {
 
 pub fn download() -> IO<()> {
     let mut db = Db::new();
-    let (titles, _) = TitlesDiff::new()?;
+    let (titles, _) = TitlesDiff::build()?;
     db.titles = titles.dup();
     db.download(&db.wiki.clone().expect("Error loading Wikidot").list(&db.client)?)
 }

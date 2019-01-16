@@ -30,7 +30,7 @@ impl<O: Output + 'static> Command<O> for Search {
 
         match size {
             0 => Err(NoResults),
-            1 => Ok(irc.reply(&ctx, &self.show_result(&opts, &db)?)?),
+            1 => { irc.reply(&ctx, &self.show_result(&opts, &db)?)?; Ok(()) },
             _ => Err(Ambiguous(size, 
                 Self::build_query(&opts)?
                     .select(db::page::title)
@@ -53,7 +53,7 @@ impl Search {
         //opts.optopt("r", "rating", "Limit to a range of ratings", "SCORE"); // TODO
         // opts.optopt("s", "strict", "Match exact words", "WORDS");
         //opts.optopt("f", "fullname", "Match an exact full name", "TITLE")
-        Search { wiki, opts }
+        Self { wiki, opts }
     }
 
     fn build_query(opts: &Matches) 

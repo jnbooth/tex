@@ -30,7 +30,7 @@ impl<O: Output + 'static> Command<O> for Memo {
     fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        let say = |msg: String| Ok(irc.reply(ctx, &msg)?);
+        let say = |msg: String| { irc.reply(ctx, &msg)?; Ok(()) };
         if self.shortcut {
             match args.split_first() {
                 None => Err(InvalidArgs)?,
@@ -53,7 +53,8 @@ impl<O: Output + 'static> Command<O> for Memo {
                     )),
                     Err(NoResults) => {
                         self.insert(&msg.join(" "), &nick.to_lowercase(), ctx, db)?;
-                        Ok(irc.action(&ctx, &attribute(nick, ctx))?)
+                        irc.action(&ctx, &attribute(nick, ctx))?;
+                        Ok(())
                     },
                     Err(e) => Err(e)
                 },
@@ -69,7 +70,8 @@ impl<O: Output + 'static> Command<O> for Memo {
                         say(format!("To delete that memo, use .memo del {} \x1d{}\x1d", nick, s)),
                     _ => {
                             self.remove(&nick.to_lowercase(), ctx, db)?;
-                            Ok(irc.action(&ctx, &format!("erases {}'s memo.", nick))?)
+                            irc.action(&ctx, &format!("erases {}'s memo.", nick))?;
+                            Ok(())
                         }
                 },
                 _ => Err(InvalidArgs)
@@ -80,7 +82,7 @@ impl<O: Output + 'static> Command<O> for Memo {
 
 impl Memo {
     pub fn new(shortcut: bool) -> Self {
-        Memo {
+        Self {
             shortcut,
             #[cfg(test)]
             db: LocalMap::new()

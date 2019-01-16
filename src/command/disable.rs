@@ -22,20 +22,21 @@ impl<O: Output + 'static> Command<O> for Disable {
             _         => self.canons.get(&cmd)
         };
         match canon {
-            None        => Ok(irc.reply(ctx, "I'm sorry, I don't know that command.")?),
+            None        => irc.reply(ctx, "I'm sorry, I don't know that command.")?,
             Some(canon) => {
                 self.set_enabled(&canon, ctx, db)?;
-                Ok(irc.action(ctx, 
+                irc.action(ctx, 
                     &format!("{}s .{}.", if self.enable { "enable" } else { "disable" }, canon)
-                )?)
+                )?
             }
         }
+        Ok(())
     }
 }
 
 impl Disable {
     pub fn new(enable: bool, canons: HashMap<String, String>) -> Self {
-        Disable { enable, canons }
+        Self { enable, canons }
     }
     
     pub fn set_enabled(&self, cmd: &str, ctx: &Context, db: &mut Db) -> Outcome<()> {

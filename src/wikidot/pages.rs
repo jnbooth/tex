@@ -13,10 +13,10 @@ pub struct PagesDiff {
 }
 
 impl PagesDiff {
-    pub fn new(wiki: Wikidot) -> IO<(PagesDiff, Receiver<(String, bool)>)> {
+    pub fn build(wiki: Wikidot) -> IO<(Self, Receiver<(String, bool)>)> {
         let (sender, receiver) = channel();
         let client = Client::new();
-        Ok((PagesDiff {
+        Ok((Self {
             sender, 
             pages: wiki.list(&client)?,
             wiki,

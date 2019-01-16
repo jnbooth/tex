@@ -20,15 +20,15 @@ pub struct Wikidot {
 }
 
 impl Wikidot {
-    pub fn new() -> Option<Self> {
+    pub fn build() -> Option<Self> {
         let root = env::opt("WIKIDOT_ROOT")?;
         let site = root.split('.').next()?;
         let api = env::api("WIKIDOT", "USER", "KEY")?;
         let auth = format!("Basic {}", base64::encode(&format!("{}:{}", api.user, api.key)));
-        Some(Wikidot {
+        Some(Self {
             ajax:   format!("http://{}.wikidot.com/ajax-module-connector.php", site),
             root:   root.to_owned(),
-            rpc:    format!("https://www.wikidot.com/xml-rpc-api.php"),
+            rpc:    "https://www.wikidot.com/xml-rpc-api.php".to_owned(),
             site:   site.to_owned(),
             auth
         })
@@ -51,13 +51,13 @@ impl Wikidot {
             .form(&full_args)
             .send()?;
         let json: serde_json::Value = serde_json::from_reader(res)?;
-        let body = get_body(&json).ok_or(failure::err_msg(
+        let body = get_body(&json).ok_or_else(||failure::err_msg(
             format!("Invalid response from {} for {:?}", module_name, args))
         )?;
         Ok(Document::from(body))
     }
 
-    pub fn get(&self, articles: &Vec<String>, cli: &Client) -> Result<Vec<Page>, xmlrpc::Error> {
+    pub fn get(&self, articles: &[String], cli: &Client) -> Result<Vec<Page>, xmlrpc::Error> {
         let pages = articles.into_iter().map(|x| Value::from(x.to_owned())).collect();
         let res = self.xml_rpc(cli, "pages.get_meta", vec![
             ("site",  Value::from(self.site.to_owned())),
@@ -67,7 +67,7 @@ impl Wikidot {
             .as_struct()
             .expect("Invalid pages.get_meta response")
             .into_iter()
-            .filter_map(|(_, v)| Page::new(v))
+            .filter_map(|(_, v)| Page::build(v))
             .collect()
         )
     }
@@ -94,7 +94,22 @@ impl Wikidot {
             ("pages", Value::Array(vec![Value::from(title.to_owned())]))
         ]).ok()?;
         let (_, page) = res.as_struct()?.iter().next()?;
-        Some(Page::new(page)?.rating)
+        Some(Page::build(page)?.rating)
+    }
+
+    pub fn rates(&self, titles: &[String], cli: &Client) -> Option<i32> {
+        let mut score = 0;
+        for chunk in titles.chunks(10) {
+            let pages = chunk.into_iter().map(|x| Value::from(x.to_owned())).collect();
+            let res = self.xml_rpc(&cli, "pages.get_meta", vec![
+                ("site",  Value::from(self.site.to_owned())),
+                ("pages", Value::Array(pages))
+            ]).ok()?;
+            for page in res.as_struct()?.values() {
+                score += Page::build(page)?.rating;
+            }
+        }
+        Some(score)
     }
 
     pub fn walk<F>(&self, titles: &[String], cli: &Client, mut f: F) -> IO<()> 

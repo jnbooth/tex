@@ -22,6 +22,7 @@ mod tell;
 mod wikipedia;
 mod zyn;
 
+//#[cfg(not(test))] mod author;
 #[cfg(not(test))] mod search;
 
 use crate::{Context, db, env};
@@ -65,16 +66,18 @@ impl<O: Output + 'static> Commands<O> {
         x.store(zyn::Zyn);
         for &i in &[false, true] {
             x.store(memo::Memo::new(i));
-            if let Some(g) = google::Google::new(i) {
+            if let Some(g) = google::Google::build(i) {
                 x.store(g);
             }
         }
-        match name::Name::new() {
+        match name::Name::build() {
             Err(e)    => println!("Error creating name command: {}", e),
             Ok(names) => x.store(names)
         }
-        if let Some(wiki) = Wikidot::new() {
+        if let Some(wiki) = Wikidot::build() {
             x.store(lastcreated::LastCreated::new(wiki.clone()));
+            //#[cfg(not(test))]
+            //x.store(author::Author::new(wiki.clone()));
             #[cfg(not(test))]
             x.store(search::Search::new(wiki));
         }
@@ -122,7 +125,7 @@ impl<O: Output + 'static> Commands<O> {
             Err(Unauthorized)
         } else {
             match (cmd, args) {
-                ("help", [query]) => Ok(irc.reply(ctx, &self.usage(query))?),
+                ("help", [query]) => { irc.reply(ctx, &self.usage(query))?; Ok(()) }
                 ("help", _)       => Err(InvalidArgs),
                 _ => {
                     let key = self.keys.get(cmd).ok_or(Unknown)?;
@@ -143,5 +146,5 @@ impl<O: Output + 'static> Commands<O> {
 
 
 fn abbrev(s: &str) -> Vec<String> {
-    (0..s.len()).rev().map(|i| s[0..i+1].to_owned()).collect()
+    (0..s.len()).rev().map(|i| s[..=i].to_owned()).collect()
 }

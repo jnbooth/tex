@@ -19,15 +19,16 @@ impl<O: Output + 'static> Command<O> for Choose {
     fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, _: &mut Db) -> Outcome<()> {
         let choices = args.join(" ");
         let opts: Vec<&str> = choices.split(',').map(str::trim).collect();
-        Ok(irc.reply(ctx, self.choose(opts))?)
+        irc.reply(ctx, self.choose(&opts))?;
+        Ok(())
     }
 }
 
 impl Choose {
     pub fn new() -> Self {
-        Choose { rng: rand::thread_rng() }
+        Self { rng: rand::thread_rng() }
     }
-    fn choose<'a>(&mut self, xs: Vec<&'a str>) -> &'a str {
+    fn choose<'a>(&mut self, xs: &[&'a str]) -> &'a str {
         xs[self.rng.gen_range(0, xs.len())]
     }
 }
