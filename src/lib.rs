@@ -80,8 +80,11 @@ impl Context {
 }
 
 fn init() -> IO<Db> {
+    println!("Loading database...");
     let mut db = Db::new();
+    println!("Loaded.");
 
+    println!("Starting title scanner...");
     let (mut titles, titles_r) = TitlesDiff::build()?;
     db.titles = titles.dup();
     db.titles_r = Some(titles_r);
@@ -91,17 +94,21 @@ fn init() -> IO<Db> {
             titles.diff().expect("Title thread error");
         }
     });
+    println!("Started.");
 
     if let Some(wiki) = &db.wiki {
+        println!("Starting page scanner...");
         let (mut pages, pages_r) = PagesDiff::build(wiki.clone())?;
         db.loaded_r = Some(pages_r);
+        println!("Scanning...");
         db.download(&pages.dup())?;
         thread::spawn(move || {
-        loop {
-            thread::sleep(Duration::from_secs(60));
-            pages.diff().expect("Title thread error");
-        }
-    });
+            loop {
+                thread::sleep(Duration::from_secs(60));
+                pages.diff().expect("Title thread error");
+            }
+        });
+        println!("Started.");
     }
     Ok(db)
 }
@@ -110,10 +117,12 @@ pub fn run() -> IO<()> {
     let mut cmds = Commands::new();
     let mut db = init()?;
 
+    println!("Connecting...");
     let mut reactor = IrcReactor::new()?;
     let client = reactor.prepare_client_and_connect(&env::irc())?;
     client.send_cap_req(&CAPABILITIES).expect("Error negotiating capabilities");
     client.identify()?;
+    println!("Connected.");
 
     reactor.
         register_client_with_handler(client, move |c, m| handler::handle(m, &mut cmds, c, &mut db));
@@ -136,11 +145,4 @@ pub fn offline() -> IO<()> {
         handler::handle(message, &mut cmds, &client, &mut db)?;
     }
     Ok(())
-}
-
-pub fn download() -> IO<()> {
-    let mut db = Db::new();
-    let (titles, _) = TitlesDiff::build()?;
-    db.titles = titles.dup();
-    db.download(&db.wiki.clone().expect("Error loading Wikidot").list(&db.client)?)
 }

@@ -135,15 +135,14 @@ impl Db {
     #[cfg(not(test))]
     fn load<Frm, To, C, L, F>(&self, table: L, f: F) -> QueryResult<C>
     where C: FromIterator<To>, L: LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
-        Ok(C::from_iter(table.load::<Frm>(&self.conn)?.into_iter().map::<To, F>(f)))
+        Ok(table.load::<Frm>(&self.conn)?.into_iter().map::<To, F>(f).collect())
     }
 
     #[cfg(not(test))]
     pub fn reload(&mut self) -> QueryResult<()> {
         self.bans = Bans::build();
-        self.loaded = HashSet::from_iter(
-            page::table.select(page::fullname).get_results(&self.conn)?.into_iter()
-        );
+        self.loaded = page::table.select(page::fullname)
+            .get_results(&self.conn)?.into_iter().collect();
         self.silences = self.load::<DbSilence,_,_,_,_>
             (silence::table, Silence::from)?;
         self.reminders = self.load::<DbReminder,_,_,_,_>

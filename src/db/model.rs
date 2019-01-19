@@ -101,7 +101,7 @@ impl Page {
             ::parse_from_rfc3339(obj.get("created_at")?.as_str()?)
             .ok()?
             .with_timezone(&Utc);
-        let created_by = obj.get("created_by")?.as_str()?.to_owned();
+        let created_by = obj.get("created_by")?.as_str()?.to_lowercase();
         let fullname = obj.get("fullname")?.as_str()?.to_owned();
         let rating = obj.get("rating")?.as_i32()?;
         let title = obj.get("title")?.as_str()?.to_owned();

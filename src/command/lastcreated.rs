@@ -13,20 +13,16 @@ pub struct LastCreated {
     wiki: Wikidot
 }
 
-impl<O: Output + 'static> Command<O> for LastCreated {
+impl Command for LastCreated {
     fn cmds(&self) -> Vec<String> {
         own(&["lastcreated", "lc", "l"])
     }
     fn usage(&self) -> String { "".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, _: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        for page in self.last_created(&db)? {
-            irc.reply(ctx, &page)?;
-        }
-        Ok(())
+    fn run(&mut self, _: &[&str], _: &Context, db: &mut Db) -> Outcome {
+        self.last_created(&db)
     }
 }
 
@@ -35,14 +31,18 @@ impl LastCreated {
         Self { wiki }
     }
 
-    fn last_created(&self, db: &Db) -> Outcome<Vec<String>> {
+    fn last_created(&self, db: &Db) -> Result<Vec<Response>, Error> {
         let pages = self.wiki.request_module("list/ListPagesModule", &db.client, &[
             ("body", "title created_by created_at"),
             ("order", "created_at desc"),
             ("rating", ">=-10"),
             ("limit", &LIMIT.to_string())
         ]).map_err(Throw)?;
-        Ok(pages.find(Class("list-pages-item")).filter_map(|x| self.parse_lc(&x, db)).collect())
+        Ok(pages.find(Class("list-pages-item"))
+            .filter_map(|x| self.parse_lc(&x, db))
+            .map(Reply)
+            .collect()
+        )
     }    
 
     fn parse_lc(&self, val: &Node, db: &Db) -> Option<String> {
@@ -62,7 +62,7 @@ impl LastCreated {
     }
 }
 
-fn parse_time(timestamp: &str) -> Outcome<String> {
+fn parse_time(timestamp: &str) -> Result<String, Error> {
     let naive = NaiveDateTime::parse_from_str(&timestamp, "%_d %b %Y %H:%M")?;
     let datetime: DateTime<FixedOffset> = DateTime::from_utc(naive, FixedOffset::west(TIMEZONE));
     Ok(util::ago(SystemTime::from(datetime)))

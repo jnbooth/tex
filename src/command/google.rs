@@ -8,18 +8,16 @@ pub struct Google {
     img: bool
 }
 
-impl<O: Output + 'static> Command<O> for Google {
+impl Command for Google {
     fn cmds(&self) -> Vec<String> {
         if self.img { own(&["gis"]) } else { abbrev("google") }
     }
     fn usage(&self) -> String { "<query>".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?;
-        Ok(())
+    fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
+        Ok(vec![Reply(self.search(&args.join(" "), &db.client)?)])
     }
 }
 
@@ -49,7 +47,7 @@ impl Google {
         }
     }
 
-    fn search(&self, query: &str, cli: &reqwest::Client) -> Outcome<String> {
+    fn search(&self, query: &str, cli: &reqwest::Client) -> Result<String, Error> {
         let search_res = cli.get(&format!(
             "https://www.googleapis.com/customsearch/v1?key={}&cx={}&q={}&alt=json{}",
             self.api.key, self.api.user, util::encode(query), 

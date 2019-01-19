@@ -1,6 +1,6 @@
-use irc::client::prelude::*;
 use irc::error::IrcError;
 use irc::proto::Command::*;
+use irc::proto::message;
 use std::borrow::ToOwned;
 use std::iter::*;
 
@@ -9,12 +9,13 @@ use crate::command::Commands;
 use crate::db::Db;
 use crate::logging::*;
 use crate::output::Output;
+use crate::output::Response::*;
 use crate::error::*;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
 const CHARACTER_LIMIT: usize = 429;
 
-pub fn handle<O: Output>(message: Message, cmds: &mut Commands<O>, irc: &O, db: &mut Db) 
+pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O, db: &mut Db) 
 -> Result<(), IrcError> {
     db.listen();
     let text = message.to_string();
@@ -29,20 +30,21 @@ pub fn handle<O: Output>(message: Message, cmds: &mut Commands<O>, irc: &O, db: 
                             None         => print!("{}", text),
                             Some(reason) => {
                                 log_part(WARN, &text);
-                                irc.ban(&ctx, &reason)?;
+                                irc.respond(&ctx, Ban(reason))?;
                             }
                         }
                     }
                 },
                 PRIVMSG(_, msg) => {
                     for reminder in db.get_reminders(&ctx).into_iter().flatten() {
-                        irc.pm(&ctx, &format!("Reminder: {}", reminder.message)
+                        irc.respond(&ctx, Message(format!("Reminder: {}", reminder.message))
                         )?;
                     }
                     for tell in db.get_tells(&ctx).into_iter().flatten() {
-                        irc.pm(&ctx, &format!(
-                            "From {} at {}: {}", tell.sender, util::show_time(tell.time), tell.message
-                        ))?;
+                        irc.respond(&ctx, Message(format!(
+                            "From {} at {}: {}", 
+                            tell.sender, util::show_time(tell.time), tell.message
+                        )))?;
                     }
                     let commands = get_commands(&msg);
                     if commands.is_empty() {
@@ -90,7 +92,7 @@ fn suggest(suggestions: &[String]) -> String {
                 s.push_str(",");
             }
             s.push_str(" (");
-            s.push_str(&(i-1).to_string());
+            s.push_str(&(i+1).to_string());
             s.push_str(") ");
             s.push_str(suggest);
         }
@@ -98,7 +100,7 @@ fn suggest(suggestions: &[String]) -> String {
     }
 }
 
-fn run<O: Output>(cmds: &mut Commands<O>, message: &str, irc: &O, ctx: &Context, db: &mut Db) 
+fn run<O: Output>(cmds: &mut Commands, message: &str, irc: &O, ctx: &Context, db: &mut Db) 
 -> Result<(), IrcError> {
     let (cmd, args): (String, Vec<&str>) = match util::split_on(" ", message) {
         None         => (message.to_lowercase(), Vec::new()),
@@ -108,28 +110,33 @@ fn run<O: Output>(cmds: &mut Commands<O>, message: &str, irc: &O, ctx: &Context,
         match args.as_slice() {
             [val] => match val.parse::<usize>() {
                 Ok(i) if i > 0 => match db.choices.get(i - 1).map(ToOwned::to_owned) {
-                    None    => irc.reply(ctx, "That isn't one of my options."),
+                    None    => irc.respond(ctx, Reply("That isn't one of my options.".to_owned())),
                     Some(x) => run(cmds, &x, irc, ctx, db)
                 },
-                _ => irc.reply(ctx, &cmds.usage(&cmd))
+                _ => irc.respond(ctx, Reply(cmds.usage(&cmd)))
             },
-            _ => irc.reply(ctx, &cmds.usage(&cmd))
+            _ => irc.respond(ctx, Reply(cmds.usage(&cmd)))
         }
     } else {
-        match cmds.run(&cmd, &args, irc, ctx, db) {
+        match cmds.run(&cmd, &args, ctx, db) {
+            Ok(responses)    => {
+                for response in responses { 
+                    irc.respond(ctx, response)?;
+                }
+                Ok(())
+            },
             Err(IrcErr(e))   => Err(*e),
-            Ok(())           => Ok(()),
             Err(Unknown)     => Ok(()),
-            Err(InvalidArgs) => irc.reply(ctx, &cmds.usage(&cmd)),
-            Err(NoResults)   => irc.reply(ctx, NO_RESULTS),
+            Err(InvalidArgs) => irc.respond(ctx, Reply(cmds.usage(&cmd))),
+            Err(NoResults)   => irc.respond(ctx, Reply(NO_RESULTS.to_owned())),
             Err(Ambiguous(size, xs)) => {
                 db.choices.clear();
                 for x in &xs {
                     db.choices.push(format!("{} {}", cmd, x));
                 }
                 match size {
-                    0 => irc.reply(ctx, &suggest(&xs)),
-                    _ => irc.reply(ctx, &format!("{} ({} total)", suggest(&xs), size))
+                    0 => irc.respond(ctx, Reply(suggest(&xs))),
+                    _ => irc.respond(ctx, Reply(format!("{} ({} total)", suggest(&xs), size)))
                 }
             },
             Err(Unauthorized) => {
@@ -138,14 +145,15 @@ fn run<O: Output>(cmds: &mut Commands<O>, message: &str, irc: &O, ctx: &Context,
             },
             Err(ParseErr(e)) => {
                 log(DEBUG, &format!("Parse error for '{}': {}", message, e));
-                irc.reply(ctx, NO_RESULTS)
+                irc.respond(ctx, Reply(NO_RESULTS.to_owned()))
             },
             Err(Throw(e)) => {
             log(DEBUG, &format!("Unhandled error for '{}': {}", message, e));
                 match &db.owner {
-                    None    => irc.reply(ctx, "Something went wrong."),
-                    Some(s) => 
-                        irc.reply(ctx, &format!("Something went wrong. Please let {} know.", s))
+                    None    => irc.respond(ctx, Reply("Something went wrong.".to_owned())),
+                    Some(s) => irc.respond(ctx, Reply(
+                        format!("Something went wrong. Please let {} know.", s)
+                    ))
                 }
             }
         }

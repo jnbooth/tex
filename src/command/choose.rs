@@ -7,20 +7,18 @@ pub struct Choose {
     rng: ThreadRng
 }
 
-impl<O: Output + 'static> Command<O> for Choose {
+impl Command for Choose {
     fn cmds(&self) -> Vec<String> {
         abbrev("choose")
     }
     fn usage(&self) -> String { "<choices, separated, by, commas>".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, _: &mut Db) -> Outcome<()> {
+    fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {
         let choices = args.join(" ");
         let opts: Vec<&str> = choices.split(',').map(str::trim).collect();
-        irc.reply(ctx, self.choose(&opts))?;
-        Ok(())
+        Ok(vec![Reply(self.choose(&opts).to_owned())])
     }
 }
 

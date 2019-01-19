@@ -12,16 +12,15 @@ pub struct Search {
     wiki: Wikidot
 }
 
-impl<O: Output + 'static> Command<O> for Search {
+impl Command for Search {
     fn cmds(&self) -> Vec<String> {
         own(&["search", "searc", "sear", "sea", "s"]) // but not se(en)
     }
     fn usage(&self) -> String { "<query> [-a <author>] [-t <tag>] [-t <another>] [-< <before MM-DD-YYYY>] [-> <after MM-DD-YYYY>] [-e <exclude>] [-e <another>]".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
+    fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         let opts = self.opts.parse(args)?;
 
         let size = Self::build_query(&opts)?
@@ -30,7 +29,7 @@ impl<O: Output + 'static> Command<O> for Search {
 
         match size {
             0 => Err(NoResults),
-            1 => { irc.reply(&ctx, &self.show_result(&opts, &db)?)?; Ok(()) },
+            1 => Ok(vec![Reply(self.show_result(&opts, &db)?)]),
             _ => Err(Ambiguous(size, 
                 Self::build_query(&opts)?
                     .select(db::page::title)
@@ -57,7 +56,7 @@ impl Search {
     }
 
     fn build_query(opts: &Matches) 
-    -> Outcome<BoxedSelectStatement<db::page::SqlType, db::page::table, Pg>> {
+    -> Result<BoxedSelectStatement<db::page::SqlType, db::page::table, Pg>, Error> {
         let mut query = db::page::table
             //.distinct_on((db::page::fullname, db::page::created_at))
             .into_boxed();
@@ -94,7 +93,7 @@ impl Search {
         Ok(query)
     }
 
-    fn show_result(&self, opts: &Matches, db: &Db) -> Outcome<String> {
+    fn show_result(&self, opts: &Matches, db: &Db) -> Result<String, Error> {
         let page: db::Page = Self::build_query(opts)?.first(&db.conn)?;
         Ok(format!(
             "{} (written {} ago by {}; {}) - http://{}/{}",

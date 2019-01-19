@@ -7,21 +7,19 @@ pub struct Remindme {
     offset: Regex
 }
 
-impl<O: Output + 'static> Command<O> for Remindme {
+impl Command for Remindme {
     fn cmds(&self) -> Vec<String> {
         own(&["remindme", "remind", "r"])
     }
     fn usage(&self) -> String { "[<days>d][<hours>h][<minutes>m] message".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 1 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
+    fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let offset = self.parse_offset(&args[0]).ok_or(InvalidArgs)?;
         let when = SystemTime::now() + offset;
         add_reminder(&args[1..].join(" "), when, ctx, db)?;
-        irc.action(ctx, &format!("writes down {}'s reminder.", &ctx.nick))?;
-        Ok(())
+        Ok(vec![Action(format!("writes down {}'s reminder.", &ctx.nick))])
     }
 }
 

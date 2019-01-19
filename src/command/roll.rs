@@ -10,7 +10,7 @@ pub struct Roll {
     rng:  ThreadRng
 }
 
-impl<O: Output + 'static> Command<O> for Roll {
+impl Command for Roll {
     fn cmds(&self) -> Vec<String> {
         own(&["roll", "throw"])
     }
@@ -19,17 +19,13 @@ impl<O: Output + 'static> Command<O> for Roll {
     }
     fn fits(&self, size: usize) -> bool { size > 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, _: &mut Db) -> Outcome<()> {
+    fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {
         let content = args.join(" ");
         match self.throw(&content) {
             Err(NoResults) => Err(InvalidArgs),
             Err(err)       => Err(err),
-            Ok(roll)       => { 
-                irc.reply(ctx, &format!("{} (rolled {})", roll, content))?; 
-                Ok(()) 
-            }
+            Ok(roll)       => Ok(vec![Reply(format!("{} (rolled {})", roll, content))])
         }
     }
 }
@@ -59,7 +55,7 @@ impl Roll {
         }
     }
     
-    fn throw(&mut self, s: &str) -> Outcome<i64> {
+    fn throw(&mut self, s: &str) -> Result<i64, Error> {
         let mut score: i64 = 0;
         for die in self.dice.replace_all(s, " $1").split(' ').filter(|x| !x.is_empty()) {
             match util::split_on("d", die) {

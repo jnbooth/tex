@@ -1,8 +1,9 @@
 use irc::error::IrcError;
 
+use crate::output::Response;
 pub use self::Error::*;
 
-pub type Outcome<T> = Result<T, Error>;
+pub type Outcome = Result<Vec<Response>, Error>;
 
 #[derive(Debug)]
 pub enum Error {

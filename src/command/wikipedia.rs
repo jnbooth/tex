@@ -8,18 +8,16 @@ pub struct Wikipedia {
     parens: Regex
 }
 
-impl<O: Output + 'static> Command<O> for Wikipedia {
+impl Command for Wikipedia {
     fn cmds(&self) -> Vec<String> {
         abbrev("wikipedia")
     }
     fn usage(&self) -> String { "<query>".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?;
-        Ok(())
+    fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
+        Ok(vec![Reply(self.search(&args.join(" "), &db.client)?)])
     }
 }
 
@@ -33,7 +31,7 @@ impl Wikipedia {
         self.parens.replace_all(&s.replace("(listen)", ""), "").replace("  ", " ")
     }
     
-    fn search(&self, query: &str, cli: &reqwest::Client) -> Outcome<String> {
+    fn search(&self, query: &str, cli: &reqwest::Client) -> Result<String, Error> {
         let searches = serde_json::from_reader(
             cli.get(&format!(
                 "https://en.wikipedia.org/w/api.php?format=json&formatversion=2&action=query&list=search&srlimit=1&srprop=&srsearch={}",
@@ -52,7 +50,7 @@ impl Wikipedia {
             .ok_or_else(||ParseErr(err_msg("Unable to parse entry")))?
     }
   
-    fn get_entry(&self, page: u64, json: &Value) -> Option<Outcome<String>> {
+    fn get_entry(&self, page: u64, json: &Value) -> Option<Result<String, Error>> {
         let result = json
             .as_object()?
             .get("query")?

@@ -30,24 +30,22 @@ pub struct Name {
     female: NameList,
     last: NameList
 }
-impl<O: Output + 'static> Command<O> for Name {
+impl Command for Name {
     fn cmds(&self) -> Vec<String> {
         own(&["name", "names"])
     }
     fn usage(&self) -> String { "[-f|-m]".to_owned() }
     fn fits(&self, size: usize) -> bool { size < 2 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, _: &mut Db) -> Outcome<()> {
+    fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {
         let gender = match args {
             []     => Ok(Gender::Any),
             ["-f"] => Ok(Gender::Female),
             ["-m"] => Ok(Gender::Male),
             _      => Err(InvalidArgs)
         }?;
-        irc.reply(ctx, &self.gen(gender))?;
-        Ok(())
+        Ok(vec![Reply(self.gen(gender))])
     }
 }
 

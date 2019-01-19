@@ -22,33 +22,33 @@ mod tell;
 mod wikipedia;
 mod zyn;
 
-//#[cfg(not(test))] mod author;
+#[cfg(not(test))] mod author;
 #[cfg(not(test))] mod search;
 
 use crate::{Context, db, env};
 use crate::db::Db;
 use crate::error::*;
-use crate::output::Output;
+use crate::output::Response;
+use crate::output::Response::*;
 use crate::util::own;
 use crate::wikidot::Wikidot;
 
-trait Command<O: Output + 'static> {
+trait Command {
     fn cmds(&self) -> Vec<String>;
     fn usage(&self) -> String;
     fn auth(&self) -> i32;
     fn fits(&self, size: usize) -> bool;
-    fn reload(&mut self, db: &mut Db) -> Outcome<()>;
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()>;
+    fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome;
 }
 
 
-pub struct Commands<O: Output + 'static> {
-    stash:  Stash<Box<dyn Command<O>>, usize>,
+pub struct Commands {
+    stash:  Stash<Box<dyn Command + 'static>, usize>,
     keys:   HashMap<String, usize>,
     canons: HashMap<String, String>,
     usages: HashMap<String, String>
 }
-impl<O: Output + 'static> Commands<O> {
+impl Commands {
     pub fn new() -> Self {
         let mut x = Self::empty();
         x.store(auth::Auth);
@@ -76,8 +76,8 @@ impl<O: Output + 'static> Commands<O> {
         }
         if let Some(wiki) = Wikidot::build() {
             x.store(lastcreated::LastCreated::new(wiki.clone()));
-            //#[cfg(not(test))]
-            //x.store(author::Author::new(wiki.clone()));
+            #[cfg(not(test))]
+            x.store(author::Author::new(wiki.clone()));
             #[cfg(not(test))]
             x.store(search::Search::new(wiki));
         }
@@ -100,7 +100,7 @@ impl<O: Output + 'static> Commands<O> {
         }
     }
 
-    fn store<T: Command<O> + 'static>(&mut self, t: T) {
+    fn store<T: Command + 'static>(&mut self, t: T) {
         let cmds = t.cmds();
         let canon = cmds[0].to_owned();
         let usage = t.usage();
@@ -119,13 +119,12 @@ impl<O: Output + 'static> Commands<O> {
         }
     }
 
-    pub fn run(&mut self, cmd: &str, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) 
-    -> Outcome<()> {
+    pub fn run(&mut self, cmd: &str, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         if db.silences.contains(&ctx.channel, self.canons.get(cmd).ok_or(Unknown)?) {
             Err(Unauthorized)
         } else {
             match (cmd, args) {
-                ("help", [query]) => { irc.reply(ctx, &self.usage(query))?; Ok(()) }
+                ("help", [query]) => { Ok(vec![Reply(self.usage(query))]) }
                 ("help", _)       => Err(InvalidArgs),
                 _ => {
                     let key = self.keys.get(cmd).ok_or(Unknown)?;
@@ -136,7 +135,7 @@ impl<O: Output + 'static> Commands<O> {
                     } else if !x.fits(args.len()) {
                         Err(InvalidArgs)
                     } else {
-                        x.run(args, irc, ctx, db)
+                        x.run(args, ctx, db)
                     }
                 }
             }

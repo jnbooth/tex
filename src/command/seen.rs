@@ -3,18 +3,16 @@ use crate::util;
 
 pub struct Seen;
 
-impl<O: Output + 'static> Command<O> for Seen {
+impl Command for Seen {
     fn cmds(&self) -> Vec<String> {
         own(&["seen", "se"])
     }
     fn usage(&self) -> String { "[#<channel>] [-f|-t] <user>".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        irc.reply(ctx, &search(args, ctx,  db)?)?;
-        Ok(())
+    fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
+        Ok(vec![Reply(search(args, ctx,  db)?)])
     }
 }
 
@@ -36,7 +34,7 @@ pub fn mode(s: &str) -> Option<Mode> {
     }
 }
 
-fn search(args_im: &[&str], ctx: &Context, db: &Db) -> Outcome<String> {
+fn search(args_im: &[&str], ctx: &Context, db: &Db) -> Result<String, Error> {
     let mut args = args_im.to_owned();
     let mode = match util::pop_filter(&mut args, |x| x.starts_with('-')) {
         None       => Mode::Regular,

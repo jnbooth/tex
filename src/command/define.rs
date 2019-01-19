@@ -11,18 +11,16 @@ pub struct Define {
     parens: Regex
 }
 
-impl<O: Output + 'static> Command<O> for Define {
+impl Command for Define {
     fn cmds(&self) -> Vec<String> {
         abbrev("define")
     }
     fn usage(&self) -> String { "<query>".to_owned() }
     fn fits(&self, size: usize) -> bool { size > 0 }
     fn auth(&self) -> i32 { 0 }
-    fn reload(&mut self, _: &mut Db) -> Outcome<()> { Ok(()) }
 
-    fn run(&mut self, args: &[&str], irc: &O, ctx: &Context, db: &mut Db) -> Outcome<()> {
-        irc.reply(ctx, &self.search(&args.join(" "), &db.client)?)?;
-        Ok(())
+    fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
+        Ok(vec![Reply(self.search(&args.join(" "), &db.client)?)])
     }
 }
 
@@ -46,7 +44,7 @@ impl Define {
     }
 
         
-    fn search(&self, query: &str, cli: &reqwest::Client) -> Outcome<String> {
+    fn search(&self, query: &str, cli: &reqwest::Client) -> Result<String, Error> {
         let page = Document::from_read(
             cli.get(&format!("http://ninjawords.com/{}", util::encode(query))).send()?
         )?;

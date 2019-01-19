@@ -75,15 +75,20 @@ impl Wikidot {
     pub fn list(&self, cli: &Client) -> Result<HashSet<String>, xmlrpc::Error> {
         let res = self.xml_rpc(&cli, "pages.select", vec![
             ("site",  Value::from(self.site.to_owned())),
-            ("parent", Value::from("-".to_owned())),
             ("order", Value::from("created_at desc".to_owned()))
         ])?;
         Ok(res
             .as_array()
             .expect("Invalid pages.select response")
             .into_iter()
-            .filter_map(Value::as_str)
-            .map(ToOwned::to_owned)
+            .filter_map(|x| {
+                let s = x.as_str()?;
+                if s.starts_with("fragment:") {
+                    None
+                } else {
+                    Some(s.to_owned())
+                }
+            })
             .collect()
         )
     }
@@ -97,7 +102,7 @@ impl Wikidot {
         Some(Page::build(page)?.rating)
     }
 
-    pub fn rates(&self, titles: &[String], cli: &Client) -> Option<i32> {
+    pub fn votes(&self, titles: &[String], cli: &Client) -> Option<i32> {
         let mut score = 0;
         for chunk in titles.chunks(10) {
             let pages = chunk.into_iter().map(|x| Value::from(x.to_owned())).collect();
@@ -136,3 +141,16 @@ fn get_body(json: &serde_json::Value) -> Option<&str> {
     json.as_object()?.get("body")?.as_str()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_list() {
+        env::load();
+        let wiki = Wikidot::build().unwrap();
+        for x in wiki.list(&Client::new()).unwrap().iter().filter(|x| x.to_lowercase().contains("djkaktus")) {
+            println!("{}", x);
+        }
+    }
+}
