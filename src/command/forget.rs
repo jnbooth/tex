@@ -23,23 +23,23 @@ impl Command for Forget {
 
 fn delete_user(nick: &str, db: &mut Db) -> QueryResult<bool> {
     let user = nick.to_lowercase();
-    #[cfg(not(test))] {
-        diesel
-            ::delete(db::user::table.filter(db::user::nick.eq(&user)))
-            .execute(&db.conn)?;
-        diesel
-            ::delete(db::memo::table.filter(db::memo::user.eq(&user)))
-            .execute(&db.conn)?;
-        diesel
-            ::delete(db::seen::table.filter(db::seen::user.eq(&user)))
-            .execute(&db.conn)?;
-        diesel
-            ::delete(db::tell::table.filter(db::tell::target.eq(&user)))
-            .execute(&db.conn)?;
-        diesel
-            ::delete(db::tell::table.filter(db::tell::sender.eq(&user)))
-            .execute(&db.conn)?;
-    }
+    db.execute(diesel::delete(db::user::table.filter(db::user::nick.eq(&user))))?;
+    db.execute(diesel::delete(db::memo::table.filter(db::memo::user.eq(&user))))?;
+    db.execute(diesel::delete(db::seen::table.filter(db::seen::user.eq(&user))))?;
+    db.execute(diesel::delete(db::tell::table.filter(db::tell::target.eq(&user))))?;
+    db.execute(diesel::delete(db::tell::table.filter(db::tell::sender.eq(&user))))?;
     let removed = db.users.remove(&user);
     Ok(removed.is_some())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deletes_user() {
+        let mut db = Db::default();
+        db.users.insert(String::default(), db::User::default());
+
+    }
 }

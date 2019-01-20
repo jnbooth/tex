@@ -77,14 +77,14 @@ mod tests {
 
     fn db_test() -> Db {
         let ctx = ctx_test();
-        let mut db = Db::new();
+        let mut db = Db::default();
         db.add_seen(&ctx, "first").expect("Error adding first");
         db.add_seen(&ctx, "latest").expect("Error adding last");
         db
     }
 
     #[test]
-    fn test_first() {
+    fn first() {
         let ctx = ctx_test();
         assert_eq!(
             search(&["-f", &ctx.nick], &ctx, &db_test()).ok().unwrap(), 
@@ -93,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn test_latest() {
+    fn latest() {
         let ctx = ctx_test();
         assert_eq!(
             search(&[&ctx.nick], &ctx, &db_test()).ok().unwrap(), 
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn test_total() {
+    fn total() {
         let ctx = ctx_test();
         assert_eq!(
             search(&["-t", &ctx.nick], &ctx, &db_test()).ok().unwrap(), 
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compound() {
+    fn compound() {
         let ctx = ctx_test();
         let fake = Context::mock("#!!", &ctx.user);
         assert_eq!(
@@ -122,21 +122,21 @@ mod tests {
 
 
     #[test]
-    fn test_privmsg_is_none() {
+    fn privmsg_is_none() {
         let ctx = Context::mock("@A", "@A");
-        let mut db = Db::new();
+        let mut db = Db::default();
         db.add_seen(&ctx, "!").ok().unwrap();
         assert!(search(&[&ctx.nick], &ctx, &db_test()).is_err());
     }
 
     #[test]
-    fn test_unseen_is_none() {
+    fn unseen_is_none() {
         let ctx = Context::mock("@A", "#@");
-        assert!(search(&[&ctx.nick], &ctx, &Db::new()).is_err());
+        assert!(search(&[&ctx.nick], &ctx, &Db::default()).is_err());
     }
 
     #[test]
-    fn test_different_channel_is_none() {
+    fn different_channel_is_none() {
         let ctx = Context::mock("@A", "#@");
         let fake = Context::mock("#!!", &ctx.user);
         assert!(search(&[&ctx.nick, "-t"], &fake, &db_test()).is_err());

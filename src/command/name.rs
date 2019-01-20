@@ -51,6 +51,7 @@ impl Command for Name {
 
 impl Name {
     pub fn build() -> IO<Self> {
+        env::load();
         let conn = establish_connection();
         Ok(Self {
             female: NameList::build(&db::name_female::table.load(&conn)?)?,
@@ -75,10 +76,10 @@ mod tests {
     use super::*;
 
     #[test] #[ignore]
-    fn test_gen() {
-        let names = Name::build().unwrap();
-        println!("Female: {}", names.gen(Gender::Female));
-        println!("Male:   {}", names.gen(Gender::Male));
-        println!("Any:    {}", names.gen(Gender::Any));
+    fn generates_names() {
+        let mut names = Name::build().unwrap();
+        println!("Female: {}", names.test_def("-f").unwrap());
+        println!("Male:   {}", names.test_def("-m").unwrap());
+        println!("Any:    {}", names.test_def("").unwrap());
     }
 }

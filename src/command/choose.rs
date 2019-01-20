@@ -3,6 +3,7 @@ use rand::rngs::ThreadRng;
 
 use super::*;
 
+#[derive(Default)]
 pub struct Choose {
     rng: ThreadRng
 }
@@ -18,15 +19,28 @@ impl Command for Choose {
     fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {
         let choices = args.join(" ");
         let opts: Vec<&str> = choices.split(',').map(str::trim).collect();
-        Ok(vec![Reply(self.choose(&opts).to_owned())])
+        Ok(vec![Reply(opts[self.rng.gen_range(0, opts.len())].to_owned())])
     }
 }
 
-impl Choose {
-    pub fn new() -> Self {
-        Self { rng: rand::thread_rng() }
-    }
-    fn choose<'a>(&mut self, xs: &[&'a str]) -> &'a str {
-        xs[self.rng.gen_range(0, xs.len())]
+impl Choose { pub fn new() -> Self { Self::default() } }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hashbrown::HashSet;
+
+    #[test]
+    fn chooses_any_option() {
+        let mut db = Db::default();
+        let ctx = Context::default();
+        let mut choose = Choose::default();
+        let choices = ["a", "b c", "d"];
+        let args = choices.join(",");
+        let set: HashSet<String> = own(&choices).into_iter().collect();
+        let results: HashSet<String> = (0..crate::FUZZ)
+            .map(|_| choose.test(&args, &ctx, &mut db).expect("Error running command."))
+            .collect();
+        assert_eq!(set, results);
     }
 }

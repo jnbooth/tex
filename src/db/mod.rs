@@ -1,11 +1,13 @@
 use diesel::prelude::*;
+use diesel::helper_types::Limit;
+use diesel::query_dsl::methods::{ExecuteDsl, LimitDsl};
+use diesel::query_dsl::{LoadQuery, RunQueryDsl};
 use diesel::pg::PgConnection;
-#[cfg(not(test))] use diesel::query_dsl::methods::LoadQuery;
 use hashbrown::{HashSet, HashMap};
 use multimap::MultiMap;
 use reqwest::Client;
 use std::borrow::ToOwned;
-#[cfg(not(test))] use std::iter::*;
+use std::iter::*;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::TryRecvError::{Empty, Disconnected};
 use std::time::SystemTime;
@@ -31,66 +33,65 @@ pub fn log<T>(res: QueryResult<T>) {
 }
 
 pub struct Db {
-    #[cfg(not(test))] 
-    pub conn: PgConnection,
-    #[cfg(test)]
-    pub seen: LocalMap<Seen>,
+    nick:      String,
+    pub owner: Option<String>,
+    owner_:    Option<String>,
 
-    pub client:   Client,
-    pub nick:     String,
-    pub owner:    Option<String>,
-    pub owner_:   Option<String>,
-    pub bans:     Option<Bans>,
-    pub choices:  Vec<String>,
-
+    pub bans:      Option<Bans>,
+    pub choices:   Vec<String>,
     pub reminders: MultiMap<String, Reminder>,
     pub silences:  LocalMap<Silence>,
     pub tells:     MultiMap<String, Tell>,
     pub users:     HashMap<String, User>,
+    pub wiki:      Option<Wikidot>,
 
     pub loaded:    HashSet<String>,
     pub loaded_r:  Option<Receiver<(String, bool)>>,
     pub titles:    HashMap<String, String>,
     pub titles_r:  Option<Receiver<(String, String)>>,
 
-    pub wiki:      Option<Wikidot>
+    pub client:   Client,
+    #[cfg(not(test))] 
+    conn: PgConnection,
+    #[cfg(test)]
+    seen: LocalMap<Seen>
 }
 
-impl Default for Db { fn default() -> Self { Self::new() } }
-
-impl Db {
-    pub fn new() -> Self {
-        let mut db = Self::establish_db();
-        db.reload().expect("Error loading database");
-        db
-    }
-
-    fn establish_db() -> Self {
+impl Default for Db { 
+    fn default() -> Self { 
+        #[cfg(test)] env::load();
         let owner = env::opt("OWNER");
-        env::load();
         Db {
             client:    Client::new(),
             nick:      env::get("IRC_NICK").to_lowercase(),
             owner_:    env::opt("OWNER").map(|x| x.to_lowercase()),
             owner,
-            bans:      Bans::build(),
+            bans:      None,
             choices:   Vec::new(),
             reminders: MultiMap::new(),
             silences:  LocalMap::new(),
             tells:     MultiMap::new(),
             users:     HashMap::new(),
+            wiki:      Wikidot::build(),
 
             loaded:    HashSet::new(),
             titles:    HashMap::new(),
             loaded_r:  None,
             titles_r:  None,
-            wiki:      Wikidot::build(),
 
             #[cfg(not(test))]
             conn:      establish_connection(),
             #[cfg(test)]
             seen:      LocalMap::new()
         }
+    } 
+}
+
+impl Db {
+    pub fn new() -> Self {
+        let mut db = Self::default();
+        db.reload().expect("Error loading database");
+        db
     }
 
     pub fn listen(&mut self) {
@@ -103,14 +104,12 @@ impl Db {
                         if v == "[ACCESS DENIED]" {
                             self.titles.remove(&k);
                         } else {
-                            #[cfg(not(test))]
                             let title = format!("{}: {}", k.to_uppercase(), v);
-                            #[cfg(not(test))] log(diesel
+                            log(self.execute(diesel
                                 ::update(page::table
                                     .filter(page::fullname.eq(&k))
                                     .filter(page::title.ne(&title))
-                                ).set(page::title.eq(&title))
-                                .execute(&self.conn));
+                                ).set(page::title.eq(&title))));
                             self.titles.insert(k, v);
                         }
                     }
@@ -132,29 +131,17 @@ impl Db {
         }
     }
 
-    #[cfg(not(test))]
-    fn load<Frm, To, C, L, F>(&self, table: L, f: F) -> QueryResult<C>
-    where C: FromIterator<To>, L: LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
-        Ok(table.load::<Frm>(&self.conn)?.into_iter().map::<To, F>(f).collect())
-    }
-
-    #[cfg(not(test))]
     pub fn reload(&mut self) -> QueryResult<()> {
-        self.bans = Bans::build();
-        self.loaded = page::table.select(page::fullname)
-            .get_results(&self.conn)?.into_iter().collect();
-        self.silences = self.load::<DbSilence,_,_,_,_>
+        #[cfg(not(test))] { self.bans = Bans::build(); }
+        self.loaded = self.load(page::table.select(page::fullname))?.into_iter().collect();
+        self.silences = self.retrieve::<DbSilence,_,_,_,_>
             (silence::table, Silence::from)?;
-        self.reminders = self.load::<DbReminder,_,_,_,_>
+        self.reminders = self.retrieve::<DbReminder,_,_,_,_>
             (reminder::table, |x| (x.user.to_owned(), Reminder::from(x)))?;
-        self.tells = self.load::<DbTell,_,_,_,_>
+        self.tells = self.retrieve::<DbTell,_,_,_,_>
             (tell::table, |x| (x.target.to_owned(), Tell::from(x)))?;
-        self.users = self.load::<User,_,_,_,_>
+        self.users = self.retrieve::<User,_,_,_,_>
             (user::table, |x| (x.nick.to_owned(), x))?;
-        Ok(())
-    }
-    #[cfg(test)]
-    pub fn reload(&mut self) -> QueryResult<()> {
         Ok(())
     }
 
@@ -175,14 +162,12 @@ impl Db {
         let mut reminders = self.reminders.get_vec_mut(&ctx.user)?;
         let expired = util::drain_filter(&mut reminders, |x| x.when < when);
         
-        #[cfg(not(test))] {
         if !expired.is_empty() {
-                log(diesel
-                    ::delete(reminder::table
-                        .filter(reminder::user.eq(&ctx.user))
-                        .filter(reminder::when.lt(&when))
-                    ).execute(&self.conn));
-            }
+            log(self.execute(diesel
+                ::delete(reminder::table
+                    .filter(reminder::user.eq(&ctx.user))
+                    .filter(reminder::when.lt(&when))
+            )));
         }
         
         Some(expired)
@@ -191,12 +176,8 @@ impl Db {
     pub fn get_tells(&mut self, ctx: &Context) -> Option<Vec<Tell>> {
         let tells = self.tells.remove(&ctx.user)?;
         
-        #[cfg(not(test))] {
         if !tells.is_empty() {
-            log(diesel
-                ::delete(tell::table.filter(tell::target.eq(&ctx.user)))
-                .execute(&self.conn));
-            }
+            log(self.execute(diesel::delete(tell::table.filter(tell::target.eq(&ctx.user)))));
         }
         
         Some(tells)
@@ -213,7 +194,7 @@ impl Db {
                 latest:  message.to_owned(), latest_time: when,
                 total:   1 
             };
-            #[cfg(not(test))] diesel
+            self.execute(diesel
                 ::insert_into(seen::table)
                 .values(&seen)
                 .on_conflict((seen::channel, seen::user))
@@ -222,7 +203,8 @@ impl Db {
                     seen::latest.eq(message),
                     seen::latest_time.eq(&when),
                     seen::total.eq(seen::total + 1)
-                )).execute(&self.conn)?;
+                ))
+            )?;
             #[cfg(test)] {
                 if self.replace_seen(&seen).is_none() {
                     self.seen.insert(seen);
@@ -245,11 +227,10 @@ impl Db {
 
     #[cfg(not(test))]
     pub fn get_seen(&self, channel: &str, nick: &str) -> QueryResult<Seen> {
-        seen::table
+        self.first::<DbSeen,_>(seen::table
             .filter(seen::channel.eq(&channel.to_lowercase()))
             .filter(seen::user.eq(&nick.to_lowercase()))
-            .first::<DbSeen>(&self.conn)
-            .map(Seen::from)
+        ).map(Seen::from)
     }
     #[cfg(test)]
     pub fn get_seen(&self, channel: &str, nick: &str) -> QueryResult<Seen> {
@@ -262,12 +243,8 @@ impl Db {
     fn download_diff(&mut self, added: Vec<String>, deleted: Vec<String>) -> IO<()> {
         if let Some(wiki) = &self.wiki {
             for x in deleted {
-                diesel
-                    ::delete(page::table.filter(page::fullname.eq(&x)))
-                    .execute(&self.conn)?;
-                diesel
-                    ::delete(tag::table.filter(tag::page.eq(&x)))
-                    .execute(&self.conn)?;
+                self.execute(diesel::delete(page::table.filter(page::fullname.eq(&x))))?;
+                self.execute(diesel::delete(tag::table.filter(tag::page.eq(&x))))?;
                 self.loaded.remove(&x);
             }
             wiki.walk(&added, &self.client, |title, mut page, tags| {
@@ -275,16 +252,16 @@ impl Db {
                     page.title.push_str(": ");
                     page.title.push_str(title);
                 }
-                diesel
+                self.execute(diesel
                     ::insert_into(page::table)
                     .values(&page)
                     .on_conflict_do_nothing()
-                    .execute(&self.conn)?;
+                )?;
                 for tag in tags {
-                    diesel
+                    self.execute(diesel
                         ::insert_into(tag::table)
                         .values(Tag { name: tag, page: title.to_owned() })
-                        .execute(&self.conn)?;
+                    )?;
                 }
                 Ok(())
             })?;
@@ -311,10 +288,62 @@ impl Db {
             .collect();
         self.download_diff(added, deleted)
     }
+
+    
+
+    #[cfg(not(test))]
+    pub fn execute<T> (&self, t: T) -> QueryResult<usize> 
+    where T: RunQueryDsl<PgConnection> + ExecuteDsl<PgConnection> {
+        t.execute(&self.conn)
+    }
+    #[cfg(test)]
+    pub fn execute<T> (&self, _: T) -> QueryResult<usize> 
+    where T: RunQueryDsl<PgConnection> + ExecuteDsl<PgConnection> {
+        Ok(0)
+    }
+    #[cfg(not(test))]
+    pub fn load<U, T>(&self, t: T) -> QueryResult<Vec<U>>
+    where T: RunQueryDsl<PgConnection> + LoadQuery<PgConnection, U> {
+        t.load(&self.conn)
+    }
+    #[cfg(test)]
+    pub fn load<U, T>(&self, _: T) -> QueryResult<Vec<U>>
+    where T: RunQueryDsl<PgConnection> + LoadQuery<PgConnection, U> {
+        Ok(Vec::new())
+    }
+    #[cfg(not(test))]
+    pub fn get_result<U, T>(&self, t: T) -> QueryResult<U>
+    where T: RunQueryDsl<PgConnection> + LoadQuery<PgConnection, U> {
+        t.get_result(&self.conn)
+    }
+    #[cfg(test)]
+    pub fn get_result<U, T>(&self, _: T) -> QueryResult<U>
+    where T: RunQueryDsl<PgConnection> + LoadQuery<PgConnection, U> {
+        Err(diesel::result::Error::NotFound)
+    }
+    #[cfg(not(test))]
+    pub fn first<U, T>(&self, t: T) -> QueryResult<U>
+    where T: RunQueryDsl<PgConnection> + LimitDsl, Limit<T>: LoadQuery<PgConnection, U> {
+        t.first(&self.conn)
+    }
+    #[cfg(test)]
+    pub fn first<U, T>(&self, _: T) -> QueryResult<U>
+    where T: RunQueryDsl<PgConnection> + LimitDsl, Limit<T>: LoadQuery<PgConnection, U> {
+        Err(diesel::result::Error::NotFound)
+    }
+    #[cfg(not(test))]
+    fn retrieve<Frm, To, C, L, F>(&self, table: L, f: F) -> QueryResult<C>
+    where C: FromIterator<To>, L: LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
+        Ok(table.load::<Frm>(&self.conn)?.into_iter().map::<To, F>(f).collect())
+    }
+    #[cfg(test)]
+    fn retrieve<Frm, To, C, L, F>(&self, _: L, _: F) -> QueryResult<C>
+    where C: FromIterator<To>, L: LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
+        Ok(std::iter::empty().collect())
+    }
 }
 
 pub fn establish_connection() -> PgConnection {
-    #[cfg(test)] env::load();
     let database_url = env::get("DATABASE_URL");
     PgConnection::establish(&database_url).expect("Error connecting to database")
 }

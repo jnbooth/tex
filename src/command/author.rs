@@ -26,19 +26,12 @@ impl Author {
     }
     
     fn tally(&self, author_pat: &str, db: &Db) -> Result<String, Error> {
-        let authors: Vec<String> = db::page::table
-            .select(db::page::created_by)
-            .filter(db::page::created_by.ilike(format!("%{}%", author_pat)))
-            .distinct_on(db::page::created_by)
-            .load(&db.conn)?;
+        let authors = Self::authors(author_pat, db)?;
         let author = match authors.as_slice() {
             [author] => Ok(author),
             _        => Err(NoResults)
         }?;
-        let latest: db::Page = db::page::table
-            .filter(db::page::created_by.eq(author))
-            .order_by(db::page::created_at.desc())
-            .first(&db.conn)?;
+        let latest = Self::latest(author, db)?;
         let scps = Self::tagged("scp", author, db)?;
         let tales = Self::tagged("tale", author, db)?;
         let hubs = Self::tagged("hub", author, db)?;
@@ -98,23 +91,32 @@ impl Author {
         Ok(s)
     }
 
-    fn tagged(tag: &str, author: &str, db: &Db) -> QueryResult<Vec<String>> {
-        Ok(db::page::table
+    fn authors(author_pat: &str, db: &Db) -> QueryResult<Vec<String>> {
+        db.load(db::page::table
+            .select(db::page::created_by)
+            .filter(db::page::created_by.ilike(format!("%{}%", author_pat)))
+            .distinct_on(db::page::created_by)
+        )
+    }
+
+    fn latest(author: &str, db: &Db) -> QueryResult<db::Page> {
+        db.first(db::page::table
             .filter(db::page::created_by.eq(author))
-            .filter(exists(
-                db::tag::table
-                    .filter(db::tag::page.eq(db::page::fullname))
-                    .filter(db::tag::name.eq(tag))
-            ))
-            .load(&db.conn)?
-            .into_iter()
+            .order_by(db::page::created_at.desc())
+        )
+    }
+
+    fn tagged(tag: &str, author: &str, db: &Db) -> QueryResult<Vec<String>> {
+        Ok(db.load(db::page::table
+                .filter(db::page::created_by.eq(author))
+                .filter(exists(
+                    db::tag::table
+                        .filter(db::tag::page.eq(db::page::fullname))
+                        .filter(db::tag::name.eq(tag))
+                ))
+            )?.into_iter()
             .map(|x: db::Page| x.fullname)
-            .collect())
+            .collect()
+        )
     }
 }
-
-/*
-djkaktus ( http://www.scp-wiki.net/djkaktus ) has 104 pages (101 Originals, 3 Rewrites) (70 SCP Articles, 31 Tales, 3 GOI-Format Articles). They have 24189 net upvotes with an average of +232. Their latest page is djkaktus's Proposal III at +311.
-
-Jabyrwock: djkaktus - (http://www.scp-wiki.net/djkaktus) has 90 pages. (61 SCP articles, 29 Tales). They have 20054 net upvotes with an average of 222.  Their latest page is djkaktus's Proposal III at 311.
-*/

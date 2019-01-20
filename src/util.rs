@@ -27,7 +27,6 @@ pub fn trim(s: &str) -> String {
     content
 }
 
-#[cfg(not(test))]
 pub fn rating(i: i32) -> String {
     if i > 0 {
         format!("+{}", i)
@@ -38,7 +37,6 @@ pub fn rating(i: i32) -> String {
     }
 }
 
-#[cfg(not(test))]
 pub fn parse_date(s: &str) -> Option<DateTime<Utc>> {
     let mut fragments = if s.contains('-') {
         s.split('-')

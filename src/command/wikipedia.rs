@@ -21,6 +21,8 @@ impl Command for Wikipedia {
     }
 }
 
+impl Default for Wikipedia { fn default() -> Self { Self::new() } }
+
 impl Wikipedia {
     pub fn new() -> Self {
         Self {
@@ -131,12 +133,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_page() {
-        assert_eq!(Wikipedia::new().search("Monty Oum", &reqwest::Client::new()).unwrap(), "https://en.wikipedia.org/wiki/Monty_Oum \x02Monty Oum\x02: Monyreak \"Monty\" Oum was an American web-based animator and writer. A self-taught animator, he scripted and produced several crossover fighting video series, drawing the attention of internet production company Rooster Teeth, who hired him. […]");
+    fn searches() {
+        assert_eq!(Wikipedia::new().test_def("Monty Oum").unwrap(), "https://en.wikipedia.org/wiki/Monty_Oum \x02Monty Oum\x02: Monyreak \"Monty\" Oum was an American web-based animator and writer. A self-taught animator, he scripted and produced several crossover fighting video series, drawing the attention of internet production company Rooster Teeth, who hired him. […]");
     }
 
     #[test]
-    fn test_ambig() {
-        assert!(Wikipedia::new().search("Rock", &reqwest::Client::new()).is_err());
+    fn disambiguates() {
+        assert!(Wikipedia::new().test_def("Rock").is_err());
     }
 }

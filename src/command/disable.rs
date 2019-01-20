@@ -40,20 +40,65 @@ impl Disable {
     pub fn set_enabled(&self, cmd: &str, ctx: &Context, db: &mut Db) -> Result<(), Error> {
         if self.enable {
             db.silences.remove(&ctx.channel, &cmd);
-            #[cfg(not(test))] diesel
+            db.execute(diesel
                 ::delete(db::silence::table
                     .filter(db::silence::channel.eq(&ctx.channel))
                     .filter(db::silence::command.eq(&cmd))
-                ).execute(&db.conn)?;
+                )
+            )?;
         } else {
             let silence = db::Silence { channel: ctx.channel.to_owned(), command: cmd.to_owned() };
-            #[cfg(not(test))] diesel
+            db.execute(diesel
                 ::insert_into(db::silence::table)
                 .values(&silence)
                 .on_conflict_do_nothing()
-                .execute(&db.conn)?;
+            )?;
             db.silences.insert(silence);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    const CMD: &str = "x";
+
+    fn new(enable: bool) -> Disable {
+        let mut canons = HashMap::new();
+        canons.insert(CMD.to_owned(), CMD.to_owned());
+        Disable::new(enable, canons)
+    }
+    fn is_enabled(cmd: &str, db: &Db) -> bool {
+        !db.silences.contains(&Context::default().channel, cmd)
+    }
+
+    #[test]
+    fn disables() {
+        let mut db = Db::default();
+        let mut enable = new(true);
+        enable.run(&[CMD], &Context::default(), &mut db).unwrap();
+        let mut disable = new(false);
+        disable.run(&[CMD], &Context::default(), &mut db).unwrap();
+        assert!(!is_enabled(CMD, &db));
+    }
+
+    #[test]
+    fn enables() {
+        let mut db = Db::default();
+        let mut disable = new(false);
+        disable.run(&[CMD], &Context::default(), &mut db).unwrap();
+        let mut enable = new(true);
+        enable.run(&[CMD], &Context::default(), &mut db).unwrap();
+        assert!(is_enabled(CMD, &db));
+    }
+
+    #[test]
+    fn not_found() {
+        let mut db = Db::default();
+        let mut disable = new(false);
+        disable.run(&["y"], &Context::default(), &mut db).unwrap();
+        assert!(is_enabled("y", &db));
     }
 }

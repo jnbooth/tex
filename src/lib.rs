@@ -3,11 +3,11 @@
 use irc::client::prelude::*;
 use std::io;
 use std::io::BufRead;
-use std::iter::*;
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 mod command;
+mod context;
 mod db;
 mod error;
 mod env;
@@ -17,6 +17,7 @@ mod logging;
 mod handler;
 mod wikidot; 
 
+use self::context::Context;
 use self::db::Db;
 use self::command::Commands;
 use self::wikidot::pages::PagesDiff;
@@ -24,6 +25,9 @@ use self::wikidot::titles::TitlesDiff;
 pub use self::env::load;
 
 #[macro_use] mod util;
+
+#[cfg(test)]
+pub const FUZZ: u16 = 100;
 
 const CAPABILITIES: [Capability; 3] =
     [ Capability::ChgHost
@@ -37,46 +41,6 @@ pub type IO<T> = Result<T, failure::Error>;
 pub struct Api {
     user: String,
     key:  String
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Context {
-    pub channel: String,
-    pub nick:    String,
-    pub host:    String,
-    pub user:    String,
-    pub auth:    i32,
-    pub time:    SystemTime
-}
-impl Context {
-    pub fn build(db: &Db, message: Message) -> Option<Context> {
-        let channel = message.response_target()?.to_lowercase();
-        let prefix  = message.prefix?.to_owned();
-        let nick    = prefix.split('!').next()?.to_owned();
-        let host    = prefix.split('@').last()?.to_owned();
-        let user    = nick.to_lowercase();
-        let auth    = db.auth(&user);
-        let time    = SystemTime::now();
-
-        Some(Self { channel, nick, host, user, auth, time })
-    }
-    pub fn since(&self) -> String {
-        match self.time.elapsed() {
-            Err(_) => "now ".to_owned(),
-            Ok(x)  => format!("{}.{:02}s ", x.as_secs(), x.subsec_millis() / 10)
-        }
-    }
-    #[cfg(test)]
-    pub fn mock(channel: &str, nick: &str) -> Context {
-        Context { 
-             channel: channel.to_lowercase(),
-             nick:    nick.to_owned(),
-             host:    String::new(),
-             user:    nick.to_lowercase(),
-             auth:    0,
-             time:    SystemTime::now()
-        }
-    }
 }
 
 fn init() -> IO<Db> {

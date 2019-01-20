@@ -1,5 +1,3 @@
-use irc::error::IrcError;
-
 use crate::output::Response;
 pub use self::Error::*;
 
@@ -13,7 +11,6 @@ pub enum Error {
     NoResults,
     ParseErr(failure::Error),
     Ambiguous(i64, Vec<String>),
-    IrcErr(Box<IrcError>),
     Throw(failure::Error)
 }
 impl From<std::num::ParseIntError> for Error {
@@ -53,11 +50,6 @@ impl From<serde_json::error::Error> for Error {
 impl From<chrono::format::ParseError> for Error {
     fn from(e: chrono::format::ParseError) -> Self {
         ParseErr(failure::Error::from(e))
-    }
-}
-impl From<IrcError> for Error {
-    fn from(e: IrcError) -> Self {
-        IrcErr(Box::new(e))
     }
 }
 impl From<std::time::SystemTimeError> for Error {

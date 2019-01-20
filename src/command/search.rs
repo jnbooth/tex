@@ -23,19 +23,17 @@ impl Command for Search {
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         let opts = self.opts.parse(args)?;
 
-        let size = Self::build_query(&opts)?
-            .count()
-            .get_result(&db.conn)?;
+        let size = db.get_result(Self::build_query(&opts)?.count())?;
 
         match size {
             0 => Err(NoResults),
             1 => Ok(vec![Reply(self.show_result(&opts, &db)?)]),
             _ => Err(Ambiguous(size, 
-                Self::build_query(&opts)?
+                db.load(Self::build_query(&opts)?
                     .select(db::page::title)
                     .order(db::page::created_at.desc())
                     .limit(20)
-                    .load(&db.conn)?
+                )?
             ))
         }
     }
@@ -94,7 +92,7 @@ impl Search {
     }
 
     fn show_result(&self, opts: &Matches, db: &Db) -> Result<String, Error> {
-        let page: db::Page = Self::build_query(opts)?.first(&db.conn)?;
+        let page: db::Page = db.first(Self::build_query(opts)?)?;
         Ok(format!(
             "{} (written {} ago by {}; {}) - http://{}/{}",
             page.title,

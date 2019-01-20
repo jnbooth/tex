@@ -22,8 +22,8 @@ mod tell;
 mod wikipedia;
 mod zyn;
 
-#[cfg(not(test))] mod author;
-#[cfg(not(test))] mod search;
+mod author;
+mod search;
 
 use crate::{Context, db, env};
 use crate::db::Db;
@@ -39,9 +39,21 @@ trait Command {
     fn auth(&self) -> i32;
     fn fits(&self, size: usize) -> bool;
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome;
+    
+    #[cfg(test)]
+    fn test(&mut self, query: &str, ctx: &Context, db: &mut Db) -> Result<String, Error> {
+        let args: Vec<&str> = query.split(' ').filter(|x| !x.is_empty()).collect();
+        let res = self.run(&args, ctx, db)?;
+        let lines: Vec<String> = res.into_iter().map(|x| x.text().to_owned()).collect();
+        Ok(lines.join("\n"))
+    }
+    #[cfg(test)]
+    fn test_def(&mut self, query: &str) -> Result<String, Error> {
+        self.test(query, &Context::default(), &mut Db::default())
+    }
 }
 
-
+#[derive(Default)]
 pub struct Commands {
     stash:  Stash<Box<dyn Command + 'static>, usize>,
     keys:   HashMap<String, usize>,
@@ -50,7 +62,7 @@ pub struct Commands {
 }
 impl Commands {
     pub fn new() -> Self {
-        let mut x = Self::empty();
+        let mut x = Self::default();
         x.store(auth::Auth);
         x.store(choose::Choose::new());
         x.store(define::Define::new());
@@ -76,9 +88,7 @@ impl Commands {
         }
         if let Some(wiki) = Wikidot::build() {
             x.store(lastcreated::LastCreated::new(wiki.clone()));
-            #[cfg(not(test))]
             x.store(author::Author::new(wiki.clone()));
-            #[cfg(not(test))]
             x.store(search::Search::new(wiki));
         }
         for &i in &[false, true] {
@@ -89,15 +99,6 @@ impl Commands {
         x.usages.insert("showmore".to_owned(), "<number>".to_owned());
         x.usages.insert("sm".to_owned(), "<number>".to_owned());
         x
-    }
-
-    pub fn empty() -> Self {
-        Commands {
-            stash:  Stash::default(),
-            keys:   HashMap::new(),
-            canons: HashMap::new(),
-            usages: HashMap::new()
-        }
     }
 
     fn store<T: Command + 'static>(&mut self, t: T) {

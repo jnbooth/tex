@@ -11,6 +11,16 @@ impl Command for Hug {
     fn auth(&self) -> i32 { 0 }
 
     fn run(&mut self, _: &[&str], ctx: &Context, _: &mut Db) -> Outcome {
-        Ok(vec![Reply(format!("hugs {}.", ctx.nick))])
+        Ok(vec![Action(format!("hugs {}.", ctx.nick))])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hugs() {
+        assert_eq!(Hug.test_def("").unwrap(), "hugs .");
     }
 }

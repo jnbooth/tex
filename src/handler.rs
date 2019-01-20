@@ -125,7 +125,6 @@ fn run<O: Output>(cmds: &mut Commands, message: &str, irc: &O, ctx: &Context, db
                 }
                 Ok(())
             },
-            Err(IrcErr(e))   => Err(*e),
             Err(Unknown)     => Ok(()),
             Err(InvalidArgs) => irc.respond(ctx, Reply(cmds.usage(&cmd))),
             Err(NoResults)   => irc.respond(ctx, Reply(NO_RESULTS.to_owned())),
@@ -148,7 +147,7 @@ fn run<O: Output>(cmds: &mut Commands, message: &str, irc: &O, ctx: &Context, db
                 irc.respond(ctx, Reply(NO_RESULTS.to_owned()))
             },
             Err(Throw(e)) => {
-            log(DEBUG, &format!("Unhandled error for '{}': {}", message, e));
+                log(DEBUG, &format!("Unhandled error for '{}': {}", message, e));
                 match &db.owner {
                     None    => irc.respond(ctx, Reply("Something went wrong.".to_owned())),
                     Some(s) => irc.respond(ctx, Reply(

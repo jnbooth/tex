@@ -14,3 +14,16 @@ impl Command for Quit {
         Ok(vec![Response::Quit("Shutting down, bleep bloop.".to_owned())])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quits() {
+        match Quit.run(&[], &Context::default(), &mut Db::default()).unwrap().as_slice() {
+            [Response::Quit(_)] => (),
+            xs => panic!(format!("Invalid response: {:?}", xs))
+        }
+    }
+}

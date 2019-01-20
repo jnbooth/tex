@@ -5,13 +5,13 @@ use std::iter::FromIterator;
 
 pub trait Local {
     fn channel(&self) -> String;
-    fn user(&self) -> String;
+    fn obj(&self) -> String;
 }
 
+#[derive(Default)]
 pub struct LocalMap<T: Local + Eq + Hash>(HashMap<String, HashMap<String, T>>);
 
-impl<T: Local + Eq + Hash> Default for LocalMap<T> { fn default() -> Self { Self::new() } }
-
+#[allow(dead_code)]
 impl<T: Local + Eq + Hash> LocalMap<T> {
     pub fn new() -> Self {
         LocalMap(HashMap::new())
@@ -21,8 +21,8 @@ impl<T: Local + Eq + Hash> LocalMap<T> {
     }
     pub fn insert(&mut self, value: T) -> Option<T> {
         match self.0.entry(value.channel()) {
-            Occupied(k) => k.into_mut().insert(value.user(), value),
-            Vacant(k)   => k.insert(HashMap::new()).insert(value.user(), value)
+            Occupied(k) => k.into_mut().insert(value.obj(), value),
+            Vacant(k)   => k.insert(HashMap::new()).insert(value.obj(), value)
         }
     }
     pub fn contains(&self, channel: &str, user: &str) -> bool {
@@ -37,11 +37,14 @@ impl<T: Local + Eq + Hash> LocalMap<T> {
     pub fn get_mut(&mut self, channel: &str, user: &str) -> Option<&mut T> {
         self.0.get_mut(channel)?.get_mut(user)
     }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
     pub fn remove(&mut self, channel: &str, user: &str) -> Option<T> {
         self.0.get_mut(channel)?.remove(user)
     }
     pub fn remove_by(&mut self, t: &T) -> Option<T> {
-        self.remove(&t.channel(), &t.user())
+        self.remove(&t.channel(), &t.obj())
     }
 }
 

@@ -81,27 +81,27 @@ mod test {
     }
 
     #[test]
-    fn test_ellipses() {
+    fn condenses_ellipses() {
         assert_eq!(ellipses("...."), ".[…]");
     }
 
     #[test] #[ignore]
-    fn test_search() {
-        new(false).search("puma", &reqwest::Client::new()).unwrap();
+    fn searches() {
+        new(false).test_def("puma").unwrap();
     }
 
     #[test] #[ignore]
-    fn test_search_fail() {
-        assert!(new(false).search("!@#$", &reqwest::Client::new()).is_err());
+    fn not_found() {
+        assert!(new(false).test_def("!@#$").is_err());
     }
     
     #[test] #[ignore]
-    fn test_image_search() {
-        new(true).search("puma", &reqwest::Client::new()).unwrap();
+    fn image_searches() {
+        new(true).test_def("puma").unwrap();
     }
 
     #[test] #[ignore]
-    fn test_image_search_fail() {
-        assert!(new(true).search("!@#$", &reqwest::Client::new()).is_err());
+    fn image_not_found() {
+        assert!(new(true).test_def("!@#$").is_err());
     }
 }

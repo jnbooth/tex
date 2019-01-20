@@ -24,6 +24,8 @@ impl Command for Define {
     }
 }
 
+impl Default for Define { fn default() -> Self { Self::new() } }
+
 impl Define {
     pub fn new() -> Self {
         Self {
@@ -101,20 +103,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_search() {
-        assert_eq!(Define::new().search("gulch", &reqwest::Client::new()).unwrap(), "\x02gulch:\x02 \x1d(noun)\x1d 1. A narrow V-shaped valley with a stream running through it. 2. A remote town or village, lacking in infrastructure and equipment.");
-    }
-    
-    #[test]
-    fn test_clean_content() {
-        assert_eq!(
-            Define::new().clean("°The name for the fifth letter of the Greek alphabet, ε or Ε, preceded by delta (Δ, δ) and followed by zeta (Ζ, ζ). °In IPA, the phonetic symbol that represents the ; represented in SAMPA as E."),
-            "°The name for the fifth letter of the Greek alphabet, ε or Ε, preceded by delta and followed by zeta. °In IPA, the phonetic symbol that represents the .".to_owned()
-        );
+    fn defines_word() {
+        assert_eq!(Define::new().test_def("gulch").unwrap(), "\x02gulch:\x02 \x1d(noun)\x1d 1. A narrow V-shaped valley with a stream running through it. 2. A remote town or village, lacking in infrastructure and equipment.");
     }
 
     #[test]
-    fn test_not_found() {
-        assert!(Define::new().search("shisno", &reqwest::Client::new()).is_err());
+    fn not_found() {
+        assert!(Define::new().test_def("shisno").is_err());
     }
 }

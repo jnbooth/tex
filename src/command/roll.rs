@@ -30,10 +30,12 @@ impl Command for Roll {
     }
 }
 
+impl Default for Roll { fn default() -> Self { Self::new() } }
+
 impl Roll {
     pub fn new() -> Self {
         Self { 
-            dice: Regex::new("\\s*(\\+|-)\\s*").expect("Dice regex failed to compile"),
+            dice: Regex::new("\\s*([+-])\\s*").expect("Dice regex failed to compile"),
             rng:  rand::thread_rng() 
         }
     }
@@ -103,13 +105,11 @@ impl Roll {
 mod tests {
     use super::*;
 
-    const FUZZ: u16 = 100;
-
     #[test]
-    fn test_roll() {
+    fn rolls_properly() {
         let mut roll = Roll::new();
         let mut rng = rand::thread_rng();
-        for _ in 0..FUZZ {
+        for _ in 0..crate::FUZZ {
             let x = rng.gen();
             let y = rng.gen();
             let (min, max) = if x <= y { (x, y) } else { (y, x) };

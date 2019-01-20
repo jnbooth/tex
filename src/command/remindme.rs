@@ -23,6 +23,8 @@ impl Command for Remindme {
     }
 }
 
+impl Default for Remindme { fn default() -> Self { Self::new() } }
+
 impl Remindme {
     pub fn new() -> Self {
         Self { offset: Regex::new("\\d+").expect("Offset regex failed to compile") }
@@ -59,10 +61,7 @@ fn add_reminder(message: &str, when: SystemTime, ctx: &Context, db: &mut Db) -> 
         when,
         message: message.to_owned()
     };
-    #[cfg(not(test))] diesel
-        ::insert_into(db::reminder::table)
-        .values(&reminder)
-        .execute(&db.conn)?;
+    db.execute(diesel::insert_into(db::reminder::table).values(&reminder))?;
     db.reminders.insert(ctx.user.to_owned(), reminder);
     Ok(())
 }

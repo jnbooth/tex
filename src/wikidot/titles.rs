@@ -83,7 +83,7 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_titles() {
+    fn loads_titles() {
         let titles = record_titles(&Client::new());
         println!("{:?}", titles);
     }

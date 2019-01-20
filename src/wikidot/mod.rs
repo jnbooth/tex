@@ -57,21 +57,6 @@ impl Wikidot {
         Ok(Document::from(body))
     }
 
-    pub fn get(&self, articles: &[String], cli: &Client) -> Result<Vec<Page>, xmlrpc::Error> {
-        let pages = articles.into_iter().map(|x| Value::from(x.to_owned())).collect();
-        let res = self.xml_rpc(cli, "pages.get_meta", vec![
-            ("site",  Value::from(self.site.to_owned())),
-            ("pages", Value::Array(pages))
-        ])?;
-        Ok(res
-            .as_struct()
-            .expect("Invalid pages.get_meta response")
-            .into_iter()
-            .filter_map(|(_, v)| Page::build(v))
-            .collect()
-        )
-    }
-
     pub fn list(&self, cli: &Client) -> Result<HashSet<String>, xmlrpc::Error> {
         let res = self.xml_rpc(&cli, "pages.select", vec![
             ("site",  Value::from(self.site.to_owned())),
@@ -117,6 +102,7 @@ impl Wikidot {
         Some(score)
     }
 
+    #[cfg(not(test))]
     pub fn walk<F>(&self, titles: &[String], cli: &Client, mut f: F) -> IO<()> 
     where F: FnMut(&str, Page, Vec<String>) -> IO<()> {
         for chunk in titles.chunks(10) {
@@ -139,18 +125,4 @@ impl Wikidot {
 
 fn get_body(json: &serde_json::Value) -> Option<&str> {
     json.as_object()?.get("body")?.as_str()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_list() {
-        env::load();
-        let wiki = Wikidot::build().unwrap();
-        for x in wiki.list(&Client::new()).unwrap().iter().filter(|x| x.to_lowercase().contains("djkaktus")) {
-            println!("{}", x);
-        }
-    }
 }

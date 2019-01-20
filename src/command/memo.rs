@@ -3,9 +3,6 @@ use crate::local::LocalMap;
 
 use super::*;
 
-//#[cfg(not(test))] pub struct Rem;
-//#[cfg(test)]      pub struct Rem(LocalMap<Memo>);
-
 pub struct Memo {
     shortcut: bool,
     #[cfg(test)]
@@ -101,24 +98,22 @@ impl Memo {
 
     #[cfg(not(test))]
     pub fn get(&self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> {
-        println!("{}", user);
-        Ok(db::memo::table
-            .filter(db::memo::channel.eq(&ctx.channel))
-            .filter(db::memo::user.eq(user))
-            .first::<db::DbMemo>(&db.conn)
-            .map(|x| x.message)?
+        Ok(db.first::<db::DbMemo,_>(
+            db::memo::table
+                .filter(db::memo::channel.eq(&ctx.channel))
+                .filter(db::memo::user.eq(user))
+            )?.message
         )
     }
 
     #[cfg(not(test))]
     pub fn remove(&mut self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> {
-        Ok(diesel
+        Ok(db.get_result(diesel
             ::delete(db::memo::table
                 .filter(db::memo::channel.eq(&ctx.channel))
                 .filter(db::memo::user.eq(user))
             ).returning(db::memo::message)
-            .get_result(&db.conn)?
-        )
+        )?)
     }
 
     #[cfg(not(test))]
@@ -128,13 +123,13 @@ impl Memo {
             user:    user.to_owned(),
             message: message.to_owned()
         };
-        diesel
+        db.execute(diesel
             ::insert_into(db::memo::table)
             .values(&memo)
             .on_conflict((db::memo::channel, db::memo::user))
             .do_update()
             .set(db::memo::message.eq(message))
-            .execute(&db.conn)?;
+        )?;
         Ok(())
     }
     

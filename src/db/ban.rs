@@ -84,3 +84,12 @@ fn load_bans(page: &str) -> IO<MultiMap<String, Ban>> {
     Ok(bans)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test] #[ignore]
+    fn loads() {
+        Bans::build().expect("Failed to load bans.");
+    }
+}

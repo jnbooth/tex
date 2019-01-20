@@ -27,10 +27,7 @@ fn add_tell(message: &str, target_nick: &str, ctx: &Context, db: &mut Db) -> Que
         time:    SystemTime::now(),
         message: message.to_owned()
     };
-    #[cfg(not(test))] diesel
-        ::insert_into(db::tell::table)
-        .values(&tell)
-        .execute(&db.conn)?;
+    db.execute(diesel::insert_into(db::tell::table).values(&tell))?;
     db.tells.insert(target, tell);
     Ok(())
 }

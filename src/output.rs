@@ -6,6 +6,7 @@ use crate::Context;
 
 use self::Response::*;
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Response {
     Action(String),
     Ban(String),
@@ -13,6 +14,20 @@ pub enum Response {
     Quit(String),
     Reply(String),
     Say(String)
+}
+
+#[cfg(test)]
+impl Response {
+    pub fn text(&self) -> &str {
+        match self {
+            Action(s) => s,
+            Ban(s) => s,
+            Message(s) => s,
+            Quit(s) => s,
+            Reply(s) => s,
+            Say(s) => s
+        }
+    }
 }
 
 pub trait Output {

@@ -14,3 +14,13 @@ impl Command for Zyn {
         Ok(vec![Reply("Marp.".to_owned())])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn marps() {
+        assert_eq!(Zyn.test_def("").unwrap(), "Marp.")
+    }
+}
