@@ -59,11 +59,11 @@ mod tests {
 
     #[test]
     fn cannot_demote_unless_outranking() {
+        let mut db = Db::default();
+        Auth.run(&["4", "Foo"], &Context::admin(), &mut db).unwrap();
         let mut ctx = Context::default();
         ctx.auth = 4;
-        assert!(
-            Auth.run(&["4", "Foo"], &ctx, &mut Db::default()).is_err()
-        )
+        assert!(Auth.run(&["3", "Foo"], &ctx, &mut db).is_err());
     }
 
     #[test]
