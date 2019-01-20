@@ -11,12 +11,16 @@ impl Command for Author {
     fn cmds(&self) -> Vec<String> {
         abbrev("author")
     }
-    fn usage(&self) -> String { "<author>".to_owned() }
-    fn fits(&self, size: usize) -> bool { size == 1 }
+    fn usage(&self) -> String { "[<author>]".to_owned() }
+    fn fits(&self, size: usize) -> bool { size <= 1 }
     fn auth(&self) -> i32 { 0 }
 
-    fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
-        Ok(vec![Reply(self.tally(args[0], db)?)])
+    fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
+        let result = match args {
+            [author_pat] => self.tally(author_pat, db),
+            _            => self.tally(&ctx.nick, db)
+        }?;
+        Ok(vec![Reply(result)])
     }
 }
 
@@ -34,14 +38,12 @@ impl Author {
         let latest = Self::latest(author, db)?;
         let scps = Self::tagged("scp", author, db)?;
         let tales = Self::tagged("tale", author, db)?;
-        let hubs = Self::tagged("hub", author, db)?;
         let gois = Self::tagged("goi-format", author, db)?;
         let scps_len = scps.len();
         let tales_len = tales.len();
-        let hubs_len = hubs.len();
         let gois_len = gois.len();
 
-        let mut all: Vec<String> = [scps, tales, hubs, gois].concat();
+        let mut all: Vec<String> = [scps, tales, gois].concat();
         all.sort();
         all.dedup();
 
@@ -71,12 +73,6 @@ impl Author {
             if comma { s.push_str(", ") };
             s.push_str(&gois_len.to_string());
             s.push_str(" GOI articles");
-            comma = true;
-        }
-        if hubs_len > 0 {
-            if comma { s.push_str(", ") };
-            s.push_str(&hubs_len.to_string());
-            s.push_str(" hubs");
         }
         s.push_str("). They have ");
         s.push_str(&votes.to_string());

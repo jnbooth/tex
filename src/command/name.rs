@@ -35,7 +35,7 @@ impl Command for Name {
         own(&["name", "names"])
     }
     fn usage(&self) -> String { "[-f|-m]".to_owned() }
-    fn fits(&self, size: usize) -> bool { size < 2 }
+    fn fits(&self, size: usize) -> bool { size <= 1 }
     fn auth(&self) -> i32 { 0 }
 
     fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {

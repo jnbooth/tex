@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use diesel::dsl::{exists, not};
 use diesel::pg::Pg;
 use diesel::query_builder::BoxedSelectStatement;
@@ -17,23 +18,47 @@ impl Command for Search {
         own(&["search", "searc", "sear", "sea", "s"]) // but not se(en)
     }
     fn usage(&self) -> String { "<query> [-a <author>] [-t <tag>] [-t <another>] [-< <before MM-DD-YYYY>] [-> <after MM-DD-YYYY>] [-e <exclude>] [-e <another>]".to_owned() }
-    fn fits(&self, size: usize) -> bool { size > 0 }
+    fn fits(&self, size: usize) -> bool { size >= 1 }
     fn auth(&self) -> i32 { 0 }
 
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         let opts = self.opts.parse(args)?;
 
-        let size = db.get_result(Self::build_query(&opts)?.count())?;
+        let size = db.get_result(Self::build_query(&opts, db::page::table.count().into_boxed())?)?;
 
         match size {
             0 => Err(NoResults),
             1 => Ok(vec![Reply(self.show_result(&opts, &db)?)]),
+            _ if opts.opt_present("u") => {
+                /*Found 9657 pages by 1626 authors. They have a total rating of +949397, with an average of +98. The pages were created between 10 years ago and 3 hours ago. The highest rated page is SCP-173: The Sculpture - The Original at +4319.
+                */
+                let authors = db.execute(Self::build_query(&opts, db::page::table
+                    .select(db::page::created_by)
+                    .distinct_on(db::page::created_by)
+                    .into_boxed()
+                )?)?;
+                let earliest: DateTime<Utc> = db.get_result(Self::build_query(&opts, db::page::table
+                    .select(db::page::created_at)
+                    .order(db::page::created_at.asc())
+                    .into_boxed()
+                )?)?;
+                let latest: DateTime<Utc> = db.get_result(Self::build_query(&opts, db::page::table
+                    .select(db::page::created_at)
+                    .order(db::page::created_at.desc())
+                    .into_boxed()
+                )?)?;
+                Ok(vec![Reply(format!(
+                    "Found {} pages by {} authors. The pages were created between {} ago and {} ago.", 
+                    size, authors, util::ago(earliest), util::ago(latest)
+                ))])
+            },
             _ => Err(Ambiguous(size, 
-                db.load(Self::build_query(&opts)?
+                db.load(Self::build_query(&opts, db::page::table
                     .select(db::page::title)
                     .order(db::page::created_at.desc())
                     .limit(20)
-                )?
+                    .into_boxed()
+                )?)?
             ))
         }
     }
@@ -47,17 +72,20 @@ impl Search {
         opts.optopt("a", "author", "Limit to an author", "AUTHOR");
         opts.optopt("<", "before", "Limit to pages published before a certain date.", "MM-DD-YYYY");
         opts.optopt(">", "after", "Limit to pages published after a certain date.", "YYYY-MM-DD");
+        opts.optflag("u", "summary", "Summarize results.");
         //opts.optopt("r", "rating", "Limit to a range of ratings", "SCORE"); // TODO
         // opts.optopt("s", "strict", "Match exact words", "WORDS");
         //opts.optopt("f", "fullname", "Match an exact full name", "TITLE")
         Self { wiki, opts }
     }
 
-    fn build_query(opts: &Matches) 
-    -> Result<BoxedSelectStatement<db::page::SqlType, db::page::table, Pg>, Error> {
+    fn build_query<'a, T>(opts: &Matches, q: BoxedSelectStatement<'a, T, db::page::table, Pg>) 
+    -> Result<BoxedSelectStatement<'a, T, db::page::table, Pg>, Error> {
+        let mut query = q;
+        /*
         let mut query = db::page::table
             //.distinct_on((db::page::fullname, db::page::created_at))
-            .into_boxed();
+            .into_boxed();*/
         
         for free in &opts.free {
             query = query.filter(db::page::title.ilike(format!("%{}%", free)));
@@ -92,7 +120,7 @@ impl Search {
     }
 
     fn show_result(&self, opts: &Matches, db: &Db) -> Result<String, Error> {
-        let page: db::Page = db.first(Self::build_query(opts)?)?;
+        let page: db::Page = db.first(Self::build_query(opts, db::page::table.into_boxed())?)?;
         Ok(format!(
             "{} (written {} ago by {}; {}) - http://{}/{}",
             page.title,

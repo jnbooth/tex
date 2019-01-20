@@ -75,20 +75,28 @@ impl DurationAgo for DateTime<Utc> {
     }
 }
 
+#[inline]
+fn show_ago(amount: i64, s: &str) -> String {
+    match amount {
+        1 => format!("{} {}", amount, s),
+        _ => format!("{} {}s", amount, s)
+    }
+}
+
 pub fn ago<T: DurationAgo>(when: T) -> String {
     let dur = when.duration_ago();
     if dur.num_days() > 365 {
-        format!("{} years", dur.num_days() / 365)
-    } else if dur.num_weeks() > 1 {
-        format!("{} weeks", dur.num_weeks())
-    } else if dur.num_days() > 1 {
-        format!("{} days", dur.num_days())
-    } else if dur.num_hours() > 1 {
-        format!("{} hours", dur.num_hours())
-    } else if dur.num_minutes() > 1 {
-        format!("{} minutes", dur.num_minutes())
-    } else if dur.num_seconds() > 1 {
-        format!("{} seconds", dur.num_seconds())
+        show_ago(dur.num_days() / 365, "year")
+    } else if dur.num_weeks() > 0 {
+        show_ago(dur.num_weeks(), "week")
+    } else if dur.num_days() > 0 {
+        show_ago(dur.num_days(), "day")
+    } else if dur.num_hours() > 0 {
+        show_ago(dur.num_hours(), "hour")
+    } else if dur.num_minutes() > 0 {
+        show_ago(dur.num_minutes(), "minute")
+    } else if dur.num_seconds() > 0 {
+        show_ago(dur.num_seconds(), "second")
     } else {
         "a few seconds".to_owned()
     }

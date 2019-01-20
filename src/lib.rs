@@ -20,6 +20,7 @@ mod wikidot;
 use self::context::Context;
 use self::db::Db;
 use self::command::Commands;
+use self::logging::*;
 use self::wikidot::pages::PagesDiff;
 use self::wikidot::titles::TitlesDiff;
 pub use self::env::load;
@@ -55,7 +56,9 @@ fn init() -> IO<Db> {
     thread::spawn(move || {
         loop {
             thread::sleep(Duration::from_secs(60));
-            titles.diff().expect("Title thread error");
+            if let Err(e) = titles.diff() {
+                log(WARN, &format!("Title error: {}", e))
+            }
         }
     });
     println!("Started.");
@@ -69,7 +72,9 @@ fn init() -> IO<Db> {
         thread::spawn(move || {
             loop {
                 thread::sleep(Duration::from_secs(60));
-                pages.diff().expect("Title thread error");
+                if let Err(e) = pages.diff() {
+                    log(WARN, &format!("Page error: {}", e))
+                }
             }
         });
         println!("Started.");

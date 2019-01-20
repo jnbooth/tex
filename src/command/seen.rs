@@ -8,7 +8,7 @@ impl Command for Seen {
         own(&["seen", "se"])
     }
     fn usage(&self) -> String { "[#<channel>] [-f|-t] <user>".to_owned() }
-    fn fits(&self, size: usize) -> bool { size > 0 }
+    fn fits(&self, size: usize) -> bool { size >= 1 }
     fn auth(&self) -> i32 { 0 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {

@@ -9,7 +9,7 @@ impl Command for Tell {
         abbrev("tell")
     }
     fn usage(&self) -> String { "<user> <message>".to_owned() }
-    fn fits(&self, size: usize) -> bool { size > 1 }
+    fn fits(&self, size: usize) -> bool { size >= 2 }
     fn auth(&self) -> i32 { 0 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {

@@ -21,7 +21,7 @@ impl Command for Memo {
         }
     }   
     fn fits(&self, i: usize) -> bool { 
-        if self.shortcut { i > 1 } else { i != 2 }
+        if self.shortcut { i >= 2 } else { i != 2 }
     }
     fn auth(&self) -> i32 { 0 }
 

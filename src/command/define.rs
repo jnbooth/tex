@@ -16,7 +16,7 @@ impl Command for Define {
         abbrev("define")
     }
     fn usage(&self) -> String { "<query>".to_owned() }
-    fn fits(&self, size: usize) -> bool { size > 0 }
+    fn fits(&self, size: usize) -> bool { size >= 1 }
     fn auth(&self) -> i32 { 0 }
 
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
