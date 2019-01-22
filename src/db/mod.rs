@@ -15,6 +15,7 @@ use std::time::SystemTime;
 #[macro_use] mod model_macro;
 mod ban;
 mod model;
+pub mod pages;
 mod schema;
 
 use crate::logging;
@@ -134,8 +135,7 @@ impl Db {
     pub fn reload(&mut self) -> QueryResult<()> {
         #[cfg(not(test))] { self.bans = Bans::build(); }
         self.loaded = self.load(page::table.select(page::fullname))?.into_iter().collect();
-        self.silences = self.retrieve::<DbSilence,_,_,_,_>
-            (silence::table, Silence::from)?;
+        self.silences = self.load(silence::table)?.into_iter().collect();
         self.reminders = self.retrieve::<DbReminder,_,_,_,_>
             (reminder::table, |x| (x.user.to_owned(), Reminder::from(x)))?;
         self.tells = self.retrieve::<DbTell,_,_,_,_>
@@ -227,10 +227,10 @@ impl Db {
 
     #[cfg(not(test))]
     pub fn get_seen(&self, channel: &str, nick: &str) -> QueryResult<Seen> {
-        self.first::<DbSeen,_>(seen::table
+        self.first(seen::table
             .filter(seen::channel.eq(&channel.to_lowercase()))
             .filter(seen::user.eq(&nick.to_lowercase()))
-        ).map(Seen::from)
+        )
     }
     #[cfg(test)]
     pub fn get_seen(&self, channel: &str, nick: &str) -> QueryResult<Seen> {
@@ -239,7 +239,6 @@ impl Db {
         Ok(res.to_owned())
     }
 
-    #[cfg(not(test))]
     fn download_diff(&mut self, added: Vec<String>, deleted: Vec<String>) -> IO<()> {
         if let Some(wiki) = &self.wiki {
             for x in deleted {
@@ -247,7 +246,7 @@ impl Db {
                 self.execute(diesel::delete(tag::table.filter(tag::page.eq(&x))))?;
                 self.loaded.remove(&x);
             }
-            wiki.walk(&added, &self.client, |title, mut page, tags| {
+            wiki.walk(&added, &self.client, |title, mut page, tags: Vec<String>| {
                 if let Some(title) = self.titles.get(&page.fullname) {
                     page.title.push_str(": ");
                     page.title.push_str(title);
@@ -255,12 +254,15 @@ impl Db {
                 self.execute(diesel
                     ::insert_into(page::table)
                     .values(&page)
-                    .on_conflict_do_nothing()
+                    .on_conflict(page::fullname)
+                    .do_update()
+                    .set(page::rating.eq(page.rating))
                 )?;
                 for tag in tags {
                     self.execute(diesel
                         ::insert_into(tag::table)
                         .values(Tag { name: tag, page: title.to_owned() })
+                        .on_conflict_do_nothing()
                     )?;
                 }
                 Ok(())
@@ -269,10 +271,6 @@ impl Db {
                 self.loaded.insert(x);
             }
         }
-        Ok(())
-    }
-    #[cfg(test)]
-    fn download_diff(&mut self, _: Vec<String>, _: Vec<String>) -> IO<()> {
         Ok(())
     }
 

@@ -85,22 +85,22 @@ mod test {
         assert_eq!(ellipses("...."), ".[…]");
     }
 
-    #[test] #[ignore]
+    #[test]
     fn searches() {
         new(false).test_def("puma").unwrap();
     }
 
-    #[test] #[ignore]
+    #[test]
     fn not_found() {
         assert!(new(false).test_def("!@#$").is_err());
     }
     
-    #[test] #[ignore]
+    #[test]
     fn image_searches() {
         new(true).test_def("puma").unwrap();
     }
 
-    #[test] #[ignore]
+    #[test]
     fn image_not_found() {
         assert!(new(true).test_def("!@#$").is_err());
     }

@@ -1,6 +1,11 @@
 #[macro_use] extern crate diesel;
 
+use chrono::Utc;
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
+use hashbrown::HashSet;
 use irc::client::prelude::*;
+use std::iter::*;
 use std::io;
 use std::io::BufRead;
 use std::thread;
@@ -21,6 +26,7 @@ use self::context::Context;
 use self::db::Db;
 use self::command::Commands;
 use self::logging::*;
+use self::wikidot::Wikidot;
 use self::wikidot::pages::PagesDiff;
 use self::wikidot::titles::TitlesDiff;
 pub use self::env::load;
@@ -63,23 +69,71 @@ fn init() -> IO<Db> {
     });
     println!("Started.");
 
-    if let Some(wiki) = &db.wiki {
+    if let Some(wiki) = db.wiki.clone() {
         println!("Starting page scanner...");
         let (mut pages, pages_r) = PagesDiff::build(wiki.clone())?;
         db.loaded_r = Some(pages_r);
         println!("Scanning...");
-        db.download(&pages.dup())?;
+        let pagelist = pages.dup();
+        db.download(&pagelist)?;
         thread::spawn(move || {
             loop {
                 thread::sleep(Duration::from_secs(60));
                 if let Err(e) = pages.diff() {
-                    log(WARN, &format!("Page error: {}", e))
+                    log(WARN, &format!("Page error: {}", e));
                 }
+            }
+        });
+        println!("Started.");
+        println!("Starting metadata scanner...");
+        thread::spawn(move || {
+            let conn = db::establish_connection();
+            let cli = reqwest::Client::new();
+            loop {
+                if let Err(e) = scan(&wiki, &cli, &conn) {
+                    log(WARN, &format!("Metadata error: {}", e));
+                }
+                thread::sleep(Duration::from_secs(5 * 60));
             }
         });
         println!("Started.");
     }
     Ok(db)
+}
+
+fn scan(wiki: &Wikidot, cli: &reqwest::Client, conn: &PgConnection) -> IO<()> {
+    let start = Utc::now();
+    let pages: Vec<String> = wiki.list(cli)?;
+    wiki.walk(&pages.as_slice(), &cli, |title, page, tags: HashSet<String>| {
+        diesel::update(db::page::table.filter(db::page::fullname.eq(&page.fullname)))
+            .set(db::page::rating.eq(&page.rating))
+            .execute(conn)?;
+
+        let oldtags: HashSet<String> = db::tag::table
+            .filter(db::tag::page.eq(&page.fullname))
+            .load(conn)?
+            .into_iter()
+            .map(|x: db::Tag| x.name)
+            .collect();
+
+        for tag in oldtags.difference(&tags) {
+            diesel::delete(
+                db::tag::table
+                .filter(db::tag::page.eq(&page.fullname))
+                .filter(db::tag::name.eq(tag))
+            ).execute(conn)?;
+        }
+
+        for tag in tags.difference(&oldtags) {
+            diesel::insert_into(db::tag::table)
+                .values(db::Tag { name: tag.to_owned(), page: title.to_owned() })
+                .on_conflict_do_nothing()
+                .execute(conn)?;
+        }
+        Ok(())
+    })?;
+    println!("Scanned in {}.", util::ago(start));
+    Ok(())
 }
 
 pub fn run() -> IO<()> {

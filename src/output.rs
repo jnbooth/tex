@@ -12,8 +12,7 @@ pub enum Response {
     Ban(String),
     Message(String),
     Quit(String),
-    Reply(String),
-    Say(String)
+    Reply(String)
 }
 
 #[cfg(test)]
@@ -24,8 +23,7 @@ impl Response {
             Ban(s) => s,
             Message(s) => s,
             Quit(s) => s,
-            Reply(s) => s,
-            Say(s) => s
+            Reply(s) => s
         }
     }
 }
@@ -62,13 +60,13 @@ impl Output for IrcClient {
                 self.send_privmsg(&ctx.user, msg)
             },
             Quit(msg) => self.send_quit(msg),
-            Reply(msg) => self.respond(&ctx, Say(format!("{}: {}", ctx.nick, msg))),
-            Say(msg) => {
+            Reply(msg) => {
+                let reply = format!("{}: {}", ctx.nick, msg);
                 if ctx.channel == ctx.user {
-                    self.respond(ctx, Message(msg))
+                    self.respond(ctx, Message(reply))
                 } else {
-                    log(ECHO, &format!("{}| {}", ctx.since(), msg));
-                    self.send_notice(&ctx.channel, msg)
+                    log(ECHO, &format!("{}| {}", ctx.since(), reply));
+                    self.send_notice(&ctx.channel, reply)
                 }
             }
         }
@@ -95,12 +93,12 @@ impl Output for Offline {
                 Ok(())
             },
             Quit(msg) => panic!(msg),
-            Reply(msg) => self.respond(&ctx, Say(format!("{}: {}", ctx.nick, msg))),
-            Say(msg) => {
+            Reply(msg) => {
+                let reply = format!("{}: {}", ctx.nick, msg);
                 if ctx.channel == ctx.user {
-                    self.respond(ctx, Message(msg))
+                    self.respond(ctx, Message(reply))
                 } else {
-                    log(ECHO, &format!("{}| {}", ctx.since(), msg));
+                    log(ECHO, &format!("{}| {}", ctx.since(), reply));
                     Ok(())
                 }
             }

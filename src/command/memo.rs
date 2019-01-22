@@ -98,7 +98,7 @@ impl Memo {
 
     #[cfg(not(test))]
     pub fn get(&self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> {
-        Ok(db.first::<db::DbMemo,_>(
+        Ok(db.first::<db::Memo,_>(
             db::memo::table
                 .filter(db::memo::channel.eq(&ctx.channel))
                 .filter(db::memo::user.eq(user))

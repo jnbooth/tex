@@ -25,7 +25,7 @@ impl Command for Roll {
         match self.throw(&content) {
             Err(NoResults) => Err(InvalidArgs),
             Err(err)       => Err(err),
-            Ok(roll)       => Ok(vec![Reply(format!("{} (rolled {})", roll, content))])
+            Ok(roll)       => Ok(vec![Reply(format!("\x02{}\x02 (rolled {})", roll, content))])
         }
     }
 }

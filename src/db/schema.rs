@@ -1,6 +1,5 @@
 table! {
-    memo (id) {
-        id -> Int4,
+    memo (channel, user) {
         channel -> Varchar,
         user -> Varchar,
         message -> Varchar,
@@ -51,8 +50,7 @@ table! {
 }
 
 table! {
-    seen (id) {
-        id -> Int4,
+    seen (channel, user) {
         channel -> Varchar,
         user -> Varchar,
         first -> Varchar,
@@ -64,16 +62,14 @@ table! {
 }
 
 table! {
-    silence (id) {
-        id -> Int4,
+    silence (channel, command) {
         channel -> Varchar,
         command -> Varchar,
     }
 }
 
 table! {
-    tag (id) {
-        id -> Int4,
+    tag (name, page) {
         name -> Varchar,
         page -> Varchar,
     }

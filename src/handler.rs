@@ -42,7 +42,7 @@ pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O
                     }
                     for tell in db.get_tells(&ctx).into_iter().flatten() {
                         irc.respond(&ctx, Message(format!(
-                            "From {} at {}: {}", 
+                            "From \x02{}\x02 at {}: {}", 
                             tell.sender, util::show_time(tell.time), tell.message
                         )))?;
                     }
@@ -91,9 +91,9 @@ fn suggest(suggestions: &[String]) -> String {
             if i > 0 {
                 s.push_str(",");
             }
-            s.push_str(" (");
+            s.push_str(" \x02(");
             s.push_str(&(i+1).to_string());
-            s.push_str(") ");
+            s.push_str(")\x02 ");
             s.push_str(suggest);
         }
         s.to_owned()

@@ -53,15 +53,15 @@ fn find(nick: &str, channel: &str, mode: &Mode, db: &Db) -> Option<String> {
     let seen = db.get_seen(channel, nick).ok()?;
     match mode {
         Mode::First => Some(format!(
-            "I first saw {} {} ago, saying: {}", 
+            "I first saw \x02{}\x02 {} ago, saying: {}", 
             nick, util::ago(seen.first_time), seen.first
         )),
         Mode::Regular => Some(format!(
-            "I last saw {} {} ago, saying: {}",
+            "I last saw \x02{}\x02 {} ago, saying: {}",
             nick, util::ago(seen.latest_time), seen.latest
         )),
         Mode::Total => Some(format!(
-            "I have seen {} total message{} from {}.",
+            "I have seen \x02{}\x02 total message{} from \x02{}\x02.",
             seen.total, if seen.total != 1 { "s" } else { "" }, nick
         ))
     }
@@ -88,7 +88,7 @@ mod tests {
         let ctx = ctx_test();
         assert_eq!(
             search(&["-f", &ctx.nick], &ctx, &db_test()).ok().unwrap(), 
-            format!("I first saw {} a few seconds ago, saying: first", ctx.nick)
+            format!("I first saw \x02{}\x02 a few seconds ago, saying: first", ctx.nick)
         );
     }
 
@@ -97,7 +97,7 @@ mod tests {
         let ctx = ctx_test();
         assert_eq!(
             search(&[&ctx.nick], &ctx, &db_test()).ok().unwrap(), 
-            format!("I last saw {} a few seconds ago, saying: latest", ctx.nick)
+            format!("I last saw \x02{}\x02 a few seconds ago, saying: latest", ctx.nick)
         );
     }
 
@@ -106,7 +106,7 @@ mod tests {
         let ctx = ctx_test();
         assert_eq!(
             search(&["-t", &ctx.nick], &ctx, &db_test()).ok().unwrap(), 
-            format!("I have seen 2 total messages from {}.", ctx.nick)
+            format!("I have seen \x022\x02 total messages from \x02{}\x02.", ctx.nick)
         );
     }
 
@@ -116,7 +116,7 @@ mod tests {
         let fake = Context::mock("#!!", &ctx.user);
         assert_eq!(
             search(&[&ctx.nick, "-t", &ctx.channel], &fake, &db_test()).ok().unwrap(), 
-            format!("I have seen 2 total messages from {}.", ctx.nick)
+            format!("I have seen \x022\x02 total messages from \x02{}\x02.", ctx.nick)
         );
     }
 

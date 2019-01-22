@@ -1,7 +1,7 @@
-use hashbrown::HashSet;
 use reqwest::Client;
 use reqwest::header::AUTHORIZATION;
 use select::document::Document;
+use std::iter::*;
 use xmlrpc::Value;
 
 use crate::{IO, env};
@@ -57,7 +57,7 @@ impl Wikidot {
         Ok(Document::from(body))
     }
 
-    pub fn list(&self, cli: &Client) -> Result<HashSet<String>, xmlrpc::Error> {
+    pub fn list<T: FromIterator<String>>(&self, cli: &Client) -> Result<T, xmlrpc::Error> {
         let res = self.xml_rpc(&cli, "pages.select", vec![
             ("site",  Value::from(self.site.to_owned())),
             ("order", Value::from("created_at desc".to_owned()))
@@ -78,33 +78,18 @@ impl Wikidot {
         )
     }
 
-    pub fn rate(&self, title: &str, cli: &Client) -> Option<i32> {
+    pub fn rate(&self, title: &str, cli: &Client) -> Option<i64> {
         let res = self.xml_rpc(&cli, "pages.get_meta", vec![
             ("site",  Value::from(self.site.to_owned())),
             ("pages", Value::Array(vec![Value::from(title.to_owned())]))
         ]).ok()?;
         let (_, page) = res.as_struct()?.iter().next()?;
-        Some(Page::build(page)?.rating)
-    }
-
-    pub fn votes(&self, titles: &[String], cli: &Client) -> Option<i32> {
-        let mut score = 0;
-        for chunk in titles.chunks(10) {
-            let pages = chunk.into_iter().map(|x| Value::from(x.to_owned())).collect();
-            let res = self.xml_rpc(&cli, "pages.get_meta", vec![
-                ("site",  Value::from(self.site.to_owned())),
-                ("pages", Value::Array(pages))
-            ]).ok()?;
-            for page in res.as_struct()?.values() {
-                score += Page::build(page)?.rating;
-            }
-        }
-        Some(score)
+        Some(i64::from(Page::build(page)?.rating))
     }
 
     #[cfg(not(test))]
-    pub fn walk<F>(&self, titles: &[String], cli: &Client, mut f: F) -> IO<()> 
-    where F: FnMut(&str, Page, Vec<String>) -> IO<()> {
+    pub fn walk<T, F>(&self, titles: &[String], cli: &Client, mut f: F) -> IO<()> 
+    where T: FromIterator<String>, F: FnMut(&str, Page, T) -> IO<()> {
         for chunk in titles.chunks(10) {
             let pages = chunk.into_iter().map(|x| Value::from(x.to_owned())).collect();
             let res = self.xml_rpc(&cli, "pages.get_meta", vec![
@@ -121,8 +106,26 @@ impl Wikidot {
 
         Ok(())
     }
+    #[cfg(test)]
+    pub fn walk<T, F>(&self, _: &[String], _: &Client, _: F) -> IO<()> 
+    where T: FromIterator<String>, F: FnMut(&str, Page, T) -> IO<()> {
+        Ok(())
+    }
 }
 
 fn get_body(json: &serde_json::Value) -> Option<&str> {
     json.as_object()?.get("body")?.as_str()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test] #[ignore]
+    fn lists_pages() {
+        env::load();
+        let wiki = Wikidot::build().expect("Error loading Wikidot");
+        let list: Vec<String> = wiki.list(&Client::new()).expect("Error loading pages");
+        println!("{}", list.len());
+    }
 }

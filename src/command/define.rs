@@ -87,9 +87,9 @@ fn stringify(word: &str, defs: &MultiMap<String, String>) -> String {
         s.push_str(")\x1d");
         let mut i = 1;
         for v in vs {
-            s.push_str(" ");
+            s.push_str(" \x02");
             s.push_str(&i.to_string());
-            s.push_str(". ");
+            s.push_str(".\x02 ");
             s.push_str(v);
             i += 1;
         }
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn defines_word() {
-        assert_eq!(Define::new().test_def("gulch").unwrap(), "\x02gulch:\x02 \x1d(noun)\x1d 1. A narrow V-shaped valley with a stream running through it. 2. A remote town or village, lacking in infrastructure and equipment.");
+        assert_eq!(Define::new().test_def("gulch").unwrap(), "\x02gulch:\x02 \x1d(noun)\x1d \x021.\x02 A narrow V-shaped valley with a stream running through it. \x022.\x02 A remote town or village, lacking in infrastructure and equipment.");
     }
 
     #[test]

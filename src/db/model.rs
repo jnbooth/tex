@@ -7,14 +7,17 @@ use xmlrpc::Value;
 use crate::db::*;
 use crate::local::Local;
 
-model_default!{Memo; DbMemo; "memo"; {
-    channel: String,
-    user:    String,
-    message: String
-}}
+#[table_name = "memo"]
+#[derive(Insertable, Queryable)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Memo {
+    pub channel: String,
+    pub user:    String,
+    pub message: String
+}
 impl Local for Memo {
     fn channel(&self) -> String { self.channel.to_owned() }
-    fn obj(&self)    -> String { self.user.to_owned() }
+    fn obj(&self)     -> String { self.user.to_owned() }
 }
 
 model!{Reminder; DbReminder; "reminder"; {
@@ -28,15 +31,19 @@ impl Default for Reminder {
     }
 }
 
-model!{Seen; DbSeen; "seen"; {
-    channel:     String,
-    user:        String,
-    first:       String,
-    first_time:  SystemTime,
-    latest:      String,
-    latest_time: SystemTime,
-    total:       i32
-}}
+
+#[table_name = "seen"]
+#[derive(Insertable, Queryable)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Seen {
+    pub channel:     String,
+    pub user:        String,
+    pub first:       String,
+    pub first_time:  SystemTime,
+    pub latest:      String,
+    pub latest_time: SystemTime,
+    pub total:       i32
+}
 impl Default for Seen {
     fn default() -> Self {
         Self {
@@ -52,23 +59,28 @@ impl Default for Seen {
 }
 impl Local for Seen {
     fn channel(&self) -> String { self.channel.to_owned() }
-    fn obj(&self)    -> String { self.user.to_owned() }
+    fn obj(&self)     -> String { self.user.to_owned() }
 }
 
-model_default!{Silence; DbSilence; "silence"; {
-    channel: String,
-    command: String
-}}
-
+#[table_name = "silence"]
+#[derive(Insertable, Queryable, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Silence {
+    pub channel: String,
+    pub command: String
+}
 impl Local for Silence {
     fn channel(&self) -> String { self.channel.to_owned() }
-    fn obj(&self)    -> String { self.command.to_owned() }
+    fn obj(&self)     -> String { self.command.to_owned() }
 }
 
-model_default!{Tag; DbTag; "tag"; {
-    name:       String,
-    page:       String
-}}
+#[table_name = "tag"]
+#[derive(Insertable, Queryable, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Tag {
+    pub name: String,
+    pub page: String
+}
 
 model!{Tell; DbTell; "tell"; {
     target:  String,
@@ -132,10 +144,6 @@ impl Default for Page {
 
 impl Page {
     pub fn build(val: &Value) -> Option<Page> {
-        Some(Self::tagged(val)?.0)
-    }
-
-    pub fn tagged(val: &Value) -> Option<(Self, Vec<String>)> {
         let obj = val.as_struct()?;
         let created_at = DateTime
             ::parse_from_rfc3339(obj.get("created_at")?.as_str()?)
@@ -145,9 +153,13 @@ impl Page {
         let fullname = obj.get("fullname")?.as_str()?.to_owned();
         let rating = obj.get("rating")?.as_i32()?;
         let title = obj.get("title")?.as_str()?.to_owned();
-        let tags = obj.get("tags")?.as_array()?.into_iter()
+        Some(Self { created_at, created_by, fullname, rating, title })
+    }
+
+    pub fn tagged<T: FromIterator<String>>(val: &Value) -> Option<(Self, T)> {
+        let tags = val.as_struct()?.get("tags")?.as_array()?.into_iter()
             .filter_map(Value::as_str).map(ToOwned::to_owned).collect();
-        Some((Self { created_at, created_by, fullname, rating, title }, tags))
+        Some((Page::build(val)?, tags))
     }
 }
 

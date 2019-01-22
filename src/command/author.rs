@@ -1,9 +1,13 @@
 use diesel::dsl::exists;
+use getopts::{Matches, Options};
+
 use super::*;
+use crate::db::pages;
 use crate::util;
 use crate::wikidot::Wikidot;
 
 pub struct Author {
+    opts: Options,
     wiki: Wikidot
 }
 
@@ -11,14 +15,18 @@ impl Command for Author {
     fn cmds(&self) -> Vec<String> {
         abbrev("author")
     }
-    fn usage(&self) -> String { "[<author>]".to_owned() }
-    fn fits(&self, size: usize) -> bool { size <= 1 }
+    fn usage(&self) -> String { "[<author>] [-t <tag>] [-t <another>] [-< <before MM-DD-YYYY>] [-> <after MM-DD-YYYY>] [-e <exclude>] [-e <another>]".to_owned() }
+    fn fits(&self, _: usize) -> bool { true }
     fn auth(&self) -> i32 { 0 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
-        let result = match args {
-            [author_pat] => self.tally(author_pat, db),
-            _            => self.tally(&ctx.nick, db)
+        let mut opts = self.opts.parse(args)?;
+        let free = opts.free.clone();
+        opts.free.clear();
+        let result = match free.as_slice() {
+            []           => self.tally(&ctx.nick, &opts, db),
+            [author_pat] => self.tally(author_pat, &opts, db),
+            _            => Err(InvalidArgs)
         }?;
         Ok(vec![Reply(result)])
     }
@@ -26,63 +34,65 @@ impl Command for Author {
 
 impl Author {
     pub fn new(wiki: Wikidot) -> Self {
-        Self { wiki }
+        Self { wiki, opts: pages::options() }
     }
     
-    fn tally(&self, author_pat: &str, db: &Db) -> Result<String, Error> {
+    fn tally(&self, author_pat: &str, opts: &Matches, db: &Db) -> Result<String, Error> {
         let authors = Self::authors(author_pat, db)?;
         let author = match authors.as_slice() {
             [author] => Ok(author),
             _        => Err(NoResults)
         }?;
-        let latest = Self::latest(author, db)?;
-        let scps = Self::tagged("scp", author, db)?;
-        let tales = Self::tagged("tale", author, db)?;
-        let gois = Self::tagged("goi-format", author, db)?;
+        let scps = Self::tagged("scp", author, opts, db)?;
+        let tales = Self::tagged("tale", author, opts, db)?;
+        let gois = Self::tagged("goi-format", author, opts, db)?;
+        let hubs = Self::tagged("hub", author, opts, db)?;
+        let art = Self::tagged("artwork", author, opts, db)?;
         let scps_len = scps.len();
         let tales_len = tales.len();
         let gois_len = gois.len();
+        let hubs_len = hubs.len();
+        let art_len = art.len();
 
-        let mut all: Vec<String> = [scps, tales, gois].concat();
+        let mut all: Vec<db::Page> = [scps, tales, gois, hubs, art].concat();
         all.sort();
         all.dedup();
 
         let all_len = all.len();
 
-        let votes = self.wiki.votes(&all, &db.client).ok_or(NoResults)?;
+        let mut votes = 0;
+        let mut latest = all.first().ok_or(NoResults)?.clone();
+
+        for page in all {
+            votes += i64::from(page.rating);
+            if page.created_at < latest.created_at {
+                latest = page;
+            }
+        }
 
         let recent = self.wiki.rate(&latest.fullname, &db.client).ok_or(NoResults)?;
 
-        let mut s = author.to_owned();
-        let mut comma = false;
-        s.push_str(" has ");
+        let mut s = "\x02".to_owned();
+        s.push_str(author);
+        s.push_str("\x02 has \x02");
         s.push_str(&all_len.to_string());
-        s.push_str(" pages (");
-        if scps_len > 0 {
-            s.push_str(&scps_len.to_string());
-            s.push_str(" SCP articles");
-            comma = true;
-        }
-        if tales_len > 0 {
-            if comma { s.push_str(", ")};
-            s.push_str(&tales_len.to_string());
-            s.push_str(" tales");
-            comma = true;
-        }
-        if gois_len > 0 {
-            if comma { s.push_str(", ") };
-            s.push_str(&gois_len.to_string());
-            s.push_str(" GOI articles");
-        }
-        s.push_str("). They have ");
+        s.push_str("\x02 pages (");
+        
+        let mut comma = count(false, &mut s, scps_len, "SCP article");
+        comma = count(comma, &mut s, tales_len, "tale");
+        comma = count(comma, &mut s, gois_len, "GOI article");
+        comma = count(comma, &mut s, hubs_len, "hub");
+        count(comma, &mut s, art_len, "artwork page");
+
+        s.push_str("). They have \x02");
         s.push_str(&votes.to_string());
-        s.push_str(" net votes with an average of ");
-        s.push_str(&util::rating(votes / all.len() as i32));
-        s.push_str(". Their latest page is ");
+        s.push_str("\x02 net votes with an average of \x02");
+        s.push_str(&util::rating(votes / all_len as i64));
+        s.push_str("\x02. Their latest page is \x02");
         s.push_str(&latest.title);
-        s.push_str(" at ");
+        s.push_str("\x02 at \x02");
         s.push_str(&util::rating(recent));
-        s.push_str(".");
+        s.push_str("\x02.");
 
         Ok(s)
     }
@@ -95,24 +105,33 @@ impl Author {
         )
     }
 
-    fn latest(author: &str, db: &Db) -> QueryResult<db::Page> {
-        db.first(db::page::table
-            .filter(db::page::created_by.eq(author))
-            .order_by(db::page::created_at.desc())
-        )
-    }
-
-    fn tagged(tag: &str, author: &str, db: &Db) -> QueryResult<Vec<String>> {
-        Ok(db.load(db::page::table
+    fn tagged(tag: &str, author: &str, opts: &Matches, db: &Db) -> Result<Vec<db::Page>, Error> {
+        Ok(db.load(pages::filter(opts, db::page::table
                 .filter(db::page::created_by.eq(author))
                 .filter(exists(
                     db::tag::table
                         .filter(db::tag::page.eq(db::page::fullname))
                         .filter(db::tag::name.eq(tag))
                 ))
-            )?.into_iter()
-            .map(|x: db::Page| x.fullname)
-            .collect()
+            )?)?
         )
+    }
+}
+
+fn count(comma: bool, s: &mut String, size: usize, name: &str) -> bool {
+    if size == 0 {
+        comma
+    } else {
+        if comma {
+            s.push_str(", ");
+        }
+        s.push_str("\x02");
+        s.push_str(&size.to_string());
+        s.push_str("\x02 ");
+        s.push_str(name);
+        if size != 1 {
+            s.push_str("s");
+        }
+        true
     }
 }

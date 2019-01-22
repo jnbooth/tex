@@ -25,7 +25,7 @@ impl PagesDiff {
     }
 
     pub fn diff(&mut self) -> IO<()> {
-        let changed = self.wiki.list(&self.client)?;
+        let changed: HashSet<String> = self.wiki.list(&self.client)?;
         for added in changed.difference(&self.pages) {
             self.sender.send((added.to_owned(), true))?;
         }

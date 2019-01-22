@@ -27,7 +27,7 @@ pub fn trim(s: &str) -> String {
     content
 }
 
-pub fn rating(i: i32) -> String {
+pub fn rating(i: i64) -> String {
     if i > 0 {
         format!("+{}", i)
     } else if i < 0 {

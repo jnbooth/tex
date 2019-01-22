@@ -7,7 +7,7 @@ CREATE TABLE "page" (
 );
 
 CREATE TABLE "tag" (
-  "id"   SERIAL  PRIMARY KEY,
   "name" CHARACTER VARYING  NOT NULL,
-  "page" CHARACTER VARYING  NOT NULL
+  "page" CHARACTER VARYING  NOT NULL,
+  PRIMARY KEY ("name", "page")
 );

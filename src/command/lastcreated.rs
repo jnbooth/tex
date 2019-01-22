@@ -58,7 +58,10 @@ impl LastCreated {
                 title.push_str(more);
             }
         }
-        Some(format!("{} ({} ago by {}): http://{}{}", title, ago, author, self.wiki.root, link))
+        Some(format!(
+            "\x02{}\x02 ({} ago by {}): http://{}{}", 
+            title, ago, author, self.wiki.root, link
+        ))
     }
 }
 
