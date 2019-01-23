@@ -26,7 +26,7 @@ use self::context::Context;
 use self::db::Db;
 use self::command::Commands;
 use self::logging::*;
-use self::wikidot::Wikidot;
+use self::wikidot::{Wikidot, attribution};
 use self::wikidot::pages::PagesDiff;
 use self::wikidot::titles::TitlesDiff;
 pub use self::env::load;
@@ -55,6 +55,21 @@ fn init() -> IO<Db> {
     let mut db = Db::new();
     println!("Loaded.");
 
+    if let Some(page) = env::opt("ATTRIBUTION_PAGE") {
+        println!("Starting attribution scanner...");
+        thread::spawn(move || {
+            let conn = db::establish_connection();
+            let cli = reqwest::Client::new();
+            loop {
+                if let Err(e) = attribution::update(&page, &cli, &conn) {
+                    log(WARN, &format!("Attribution error: {}", e));
+                }
+                thread::sleep(Duration::from_secs(3600));
+            }
+        });
+        println!("Started.");
+    }
+    
     println!("Starting title scanner...");
     let (mut titles, titles_r) = TitlesDiff::build()?;
     db.titles = titles.dup();
@@ -93,7 +108,7 @@ fn init() -> IO<Db> {
                 if let Err(e) = scan(&wiki, &cli, &conn) {
                     log(WARN, &format!("Metadata error: {}", e));
                 }
-                thread::sleep(Duration::from_secs(5 * 60));
+                thread::sleep(Duration::from_secs(300));
             }
         });
         println!("Started.");

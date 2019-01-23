@@ -65,7 +65,7 @@ impl Author {
 
         for page in all {
             votes += i64::from(page.rating);
-            if page.created_at < latest.created_at {
+            if page.created_at > latest.created_at {
                 latest = page;
             }
         }
@@ -106,14 +106,13 @@ impl Author {
     }
 
     fn tagged(tag: &str, author: &str, opts: &Matches, db: &Db) -> Result<Vec<db::Page>, Error> {
-        Ok(db.load(pages::filter(opts, db::page::table
-                .filter(db::page::created_by.eq(author))
+        Ok(db.load(pages::filter_by(author, pages::filter(opts, db::page::table
                 .filter(exists(
                     db::tag::table
                         .filter(db::tag::page.eq(db::page::fullname))
                         .filter(db::tag::name.eq(tag))
                 ))
-            )?)?
+            )?))?
         )
     }
 }

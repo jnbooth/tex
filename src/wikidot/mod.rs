@@ -7,6 +7,7 @@ use xmlrpc::Value;
 use crate::{IO, env};
 use crate::db::Page;
 
+pub mod attribution;
 pub mod titles;
 pub mod pages;
 
@@ -52,7 +53,7 @@ impl Wikidot {
             .send()?;
         let json: serde_json::Value = serde_json::from_reader(res)?;
         let body = get_body(&json).ok_or_else(||failure::err_msg(
-            format!("Invalid response from {} for {:?}", module_name, args))
+            format!("Invalid response from {} for {:?}: {:?}", module_name, args, json))
         )?;
         Ok(Document::from(body))
     }

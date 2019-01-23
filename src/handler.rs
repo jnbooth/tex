@@ -13,7 +13,7 @@ use crate::output::Response::*;
 use crate::error::*;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
-const CHARACTER_LIMIT: usize = 429;
+const CHARACTER_LIMIT: usize = 0;
 
 pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O, db: &mut Db) 
 -> Result<(), IrcError> {
@@ -91,9 +91,9 @@ fn suggest(suggestions: &[String]) -> String {
             if i > 0 {
                 s.push_str(",");
             }
-            s.push_str(" \x02(");
+            s.push_str(" \x02");
             s.push_str(&(i+1).to_string());
-            s.push_str(")\x02 ");
+            s.push_str(".\x02 ");
             s.push_str(suggest);
         }
         s.to_owned()

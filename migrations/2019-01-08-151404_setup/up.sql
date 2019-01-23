@@ -4,12 +4,14 @@ CREATE TABLE "memo" (
   "message" CHARACTER VARYING  NOT NULL,
   PRIMARY KEY ("channel", "user")
 );
+
 CREATE TABLE "reminder" (
   "id"      SERIAL  PRIMARY KEY,
   "user"    CHARACTER VARYING  NOT NULL,
   "when"    TIMESTAMP  NOT NULL,
   "message" CHARACTER VARYING  NOT NULL
 );
+
 CREATE TABLE "seen" (
   "channel"     CHARACTER VARYING  NOT NULL,
   "user"        CHARACTER VARYING  NOT NULL,
@@ -20,11 +22,13 @@ CREATE TABLE "seen" (
   "total"       INT  NOT NULL  DEFAULT 1,
   PRIMARY KEY ("channel", "user")
 );
+
 CREATE TABLE "silence" (
   "channel" CHARACTER VARYING  NOT NULL, 
   "command" CHARACTER VARYING  NOT NULL,
   PRIMARY KEY ("channel", "command")
 );
+
 CREATE TABLE "tell" (
   "id"      SERIAL  PRIMARY KEY,
   "target"  CHARACTER VARYING  NOT NULL,
@@ -32,6 +36,7 @@ CREATE TABLE "tell" (
   "time"    TIMESTAMP  NOT NULL,
   "message" CHARACTER VARYING  NOT NULL
 );
+
 CREATE TABLE "user" (
   "nick"     CHARACTER VARYING  PRIMARY KEY,
   "auth"     INT  NOT NULL  DEFAULT 0,

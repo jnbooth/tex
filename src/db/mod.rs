@@ -3,6 +3,7 @@ use diesel::helper_types::Limit;
 use diesel::query_dsl::methods::{ExecuteDsl, LimitDsl};
 use diesel::query_dsl::{LoadQuery, RunQueryDsl};
 use diesel::pg::PgConnection;
+use diesel::pg::upsert::excluded;
 use hashbrown::{HashSet, HashMap};
 use multimap::MultiMap;
 use reqwest::Client;
@@ -246,27 +247,35 @@ impl Db {
                 self.execute(diesel::delete(tag::table.filter(tag::page.eq(&x))))?;
                 self.loaded.remove(&x);
             }
-            wiki.walk(&added, &self.client, |title, mut page, tags: Vec<String>| {
+            let mut pages = Vec::new();
+            let mut tags = Vec::new();
+            wiki.walk(&added, &self.client, |title, mut page, pagetags: Vec<String>| {
                 if let Some(title) = self.titles.get(&page.fullname) {
                     page.title.push_str(": ");
                     page.title.push_str(title);
                 }
-                self.execute(diesel
-                    ::insert_into(page::table)
-                    .values(&page)
-                    .on_conflict(page::fullname)
-                    .do_update()
-                    .set(page::rating.eq(page.rating))
-                )?;
-                for tag in tags {
-                    self.execute(diesel
-                        ::insert_into(tag::table)
-                        .values(Tag { name: tag, page: title.to_owned() })
-                        .on_conflict_do_nothing()
-                    )?;
+                pages.push(page);
+                for tag in pagetags {
+                    tags.push(Tag { name: tag, page: title.to_owned() });
                 }
                 Ok(())
             })?;
+            for chunk in pages.chunks(10_000) {
+                self.execute(diesel
+                    ::insert_into(page::table)
+                    .values(chunk)
+                    .on_conflict(page::fullname)
+                    .do_update()
+                    .set(page::rating.eq(excluded(page::rating)))
+                )?;
+            }
+            for chunk in tags.chunks(20_000) {
+                self.execute(diesel
+                    ::insert_into(tag::table)
+                    .values(chunk)
+                    .on_conflict_do_nothing()
+                )?;
+            }
             for x in added {
                 self.loaded.insert(x);
             }
@@ -337,7 +346,7 @@ impl Db {
     #[cfg(test)]
     fn retrieve<Frm, To, C, L, F>(&self, _: L, _: F) -> QueryResult<C>
     where C: FromIterator<To>, L: LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
-        Ok(std::iter::empty().collect())
+        Ok(empty().collect())
     }
 }
 

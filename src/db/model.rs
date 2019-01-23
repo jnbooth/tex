@@ -119,6 +119,14 @@ pub struct Name {
     pub probability: f64
 }
 
+#[table_name = "attribution"]
+#[derive(Insertable, Queryable)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Attribution {
+    pub page: String,
+    pub user: String,
+    pub kind: String
+}
 
 #[table_name = "page"]
 #[derive(Insertable, Queryable)]

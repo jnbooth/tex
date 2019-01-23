@@ -1,4 +1,12 @@
 table! {
+    attribution (page, user) {
+        page -> Varchar,
+        user -> Varchar,
+        kind -> Varchar,
+    }
+}
+
+table! {
     memo (channel, user) {
         channel -> Varchar,
         user -> Varchar,
@@ -94,6 +102,7 @@ table! {
 }
 
 allow_tables_to_appear_in_same_query!(
+    attribution,
     memo,
     name_female,
     name_last,
