@@ -51,12 +51,4 @@ mod tests {
         Reload.run(&[], &Context::default(), &mut db).unwrap();
         assert!(db.tells.is_empty());
     }
-
-    #[test]
-    fn clears_users() {
-        let mut db = Db::default();
-        db.users.insert("".to_owned(), db::User::default());
-        Reload.run(&[], &Context::default(), &mut db).unwrap();
-        assert!(db.users.is_empty());
-    }
 }

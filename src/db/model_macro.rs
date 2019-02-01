@@ -1,8 +1,9 @@
 macro_rules! model {
     ( $struct_name:ident ; $db_struct_name:ident ; $table_name:expr ; {
-        $( $attr_name:ident : $attr_type:ty ),*
+        $( pub $attr_name:ident : $attr_type:ty ),*
     }) => {
-        #[derive(Queryable)]
+        #[table_name=$table_name]
+        #[derive(Identifiable, Queryable)]
         pub struct $db_struct_name {
             pub id: i32,
             $( pub $attr_name : $attr_type ),*

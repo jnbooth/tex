@@ -1,3 +1,3 @@
 DROP TABLE "attribution";
-DROP TABLE "page";
 DROP TABLE "tag";
+DROP TABLE "page";

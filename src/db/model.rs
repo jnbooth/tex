@@ -21,9 +21,9 @@ impl Local for Memo {
 }
 
 model!{Reminder; DbReminder; "reminder"; {
-    user:    String,
-    when:    SystemTime,
-    message: String
+    pub user:    String,
+    pub when:    SystemTime,
+    pub message: String
 }}
 impl Default for Reminder {
     fn default() -> Self {
@@ -34,6 +34,15 @@ impl Default for Reminder {
 
 #[table_name = "seen"]
 #[derive(Insertable, Queryable)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SeenInsert {
+    pub channel: String,
+    pub user:    String,
+    pub first:   String,
+    pub latest:  String
+}
+
+#[derive(Queryable)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Seen {
     pub channel:     String,
@@ -74,19 +83,11 @@ impl Local for Silence {
     fn obj(&self)     -> String { self.command.to_owned() }
 }
 
-#[table_name = "tag"]
-#[derive(Insertable, Queryable, Default)]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Tag {
-    pub name: String,
-    pub page: String
-}
-
 model!{Tell; DbTell; "tell"; {
-    target:  String,
-    sender:  String,
-    time:    SystemTime,
-    message: String
+    pub target:  String,
+    pub sender:  String,
+    pub time:    SystemTime,
+    pub message: String
 }}
 impl Default for Tell {
     fn default() -> Self {
@@ -99,49 +100,30 @@ impl Default for Tell {
     }
 }
 
-#[table_name = "user"]
-#[derive(Insertable, Queryable, Default)]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct User {
-    pub nick:     String,
-    pub auth:     i32,
-    pub pronouns: Option<String>
-}
-
-#[table_name = "name_male"]
-#[table_name = "name_female"]
-#[table_name = "name_last"]
+#[table_name = "namegen"]
 #[derive(Insertable, Queryable, Default)]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Name {
-    pub name:        String,
-    pub frequency:   i32,
-    pub probability: f64
-}
-
-#[table_name = "attribution"]
-#[derive(Insertable, Queryable)]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Attribution {
-    pub page: String,
-    pub user: String,
-    pub kind: String
+pub struct NameGen {
+    pub kind:      String,
+    pub name:      String,
+    pub frequency: i32
 }
 
 #[table_name = "page"]
-#[derive(Insertable, Queryable)]
+#[derive(Identifiable, Insertable, Queryable)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Page {
-    pub fullname: String,
+    pub id: String,
     pub created_at: DateTime<Utc>,
     pub created_by: String,
     pub rating: i32,
     pub title: String
 }
+
 impl Default for Page {
     fn default() -> Self {
         Self {
-            fullname:   String::default(),
+            id:         String::default(),
             created_at: Utc::now(),
             created_by: String::default(),
             rating:     i32::default(),
@@ -153,15 +135,14 @@ impl Default for Page {
 impl Page {
     pub fn build(val: &Value) -> Option<Page> {
         let obj = val.as_struct()?;
-        let created_at = DateTime
-            ::parse_from_rfc3339(obj.get("created_at")?.as_str()?)
+        let created_at = DateTime::parse_from_rfc3339(obj.get("created_at")?.as_str()?)
             .ok()?
             .with_timezone(&Utc);
         let created_by = obj.get("created_by")?.as_str()?.to_lowercase();
-        let fullname = obj.get("fullname")?.as_str()?.to_owned();
+        let id = obj.get("fullname")?.as_str()?.to_owned();
         let rating = obj.get("rating")?.as_i32()?;
         let title = obj.get("title")?.as_str()?.to_owned();
-        Some(Self { created_at, created_by, fullname, rating, title })
+        Some(Self { created_at, created_by, id, rating, title })
     }
 
     pub fn tagged<T: FromIterator<String>>(val: &Value) -> Option<(Self, T)> {
@@ -171,4 +152,22 @@ impl Page {
     }
 }
 
-joinable!(tag -> page (page));
+#[belongs_to(Page)]
+#[table_name = "attribution"]
+#[derive(Associations, Insertable, Queryable)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Attribution {
+    pub page_id: String,
+    pub user:    String,
+    pub kind:    String
+}
+
+
+#[belongs_to(Page)]
+#[table_name = "tag"]
+#[derive(Associations, Insertable, Queryable, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Tag {
+    pub page_id: String,
+    pub name:    String
+}

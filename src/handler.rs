@@ -4,7 +4,7 @@ use irc::proto::message;
 use std::borrow::ToOwned;
 use std::iter::*;
 
-use crate::{Context, db, util};
+use crate::{Context, util};
 use crate::command::Commands;
 use crate::db::Db;
 use crate::logging::*;
@@ -13,7 +13,7 @@ use crate::output::Response::*;
 use crate::error::*;
 
 pub const NO_RESULTS: &str = "I'm sorry, I couldn't find anything.";
-const CHARACTER_LIMIT: usize = 0;
+const CHARACTER_LIMIT: usize = 400;
 
 pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O, db: &mut Db) 
 -> Result<(), IrcError> {
@@ -55,7 +55,7 @@ pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O
                             run(cmds, command, irc, &ctx, db)?
                         }
                     }
-                    db::log(db.add_seen(&ctx, &msg));
+                    db.add_seen(&ctx, &msg).log(trace!());
                 },
                 _ => print!("{}", text)
             }
@@ -143,17 +143,14 @@ fn run<O: Output>(cmds: &mut Commands, message: &str, irc: &O, ctx: &Context, db
                 Ok(()) 
             },
             Err(ParseErr(e)) => {
-                log(DEBUG, &format!("Parse error for '{}': {}", message, e));
+                log(crate::logging::INFO, &format!("Parse error for '{}': {}", message, e));
                 irc.respond(ctx, Reply(NO_RESULTS.to_owned()))
             },
             Err(Throw(e)) => {
-                log(DEBUG, &format!("Unhandled error for '{}': {}", message, e));
-                match &db.owner {
-                    None    => irc.respond(ctx, Reply("Something went wrong.".to_owned())),
-                    Some(s) => irc.respond(ctx, Reply(
-                        format!("Something went wrong. Please let {} know.", s)
-                    ))
-                }
+                log(crate::logging::INFO, &format!("Unhandled error for '{}': {}", message, e));
+                irc.respond(ctx, Reply(
+                        format!("Something went wrong. Please let {} know.", db.owner)
+                ))
             }
         }
     }

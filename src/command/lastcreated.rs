@@ -9,9 +9,7 @@ use crate::util;
 const LIMIT: u8 = 3;
 const TIMEZONE: i32 = 8 * 60 * 60;
 
-pub struct LastCreated {
-    wiki: Wikidot
-}
+pub struct LastCreated;
 
 impl Command for LastCreated {
     fn cmds(&self) -> Vec<String> {
@@ -27,12 +25,8 @@ impl Command for LastCreated {
 }
 
 impl LastCreated {
-    pub fn new(wiki: Wikidot) -> Self {
-        Self { wiki }
-    }
-
     fn last_created(&self, db: &Db) -> Result<Vec<Response>, Error> {
-        let pages = self.wiki.request_module("list/ListPagesModule", &db.client, &[
+        let pages = db.wiki.request_module("list/ListPagesModule", &db.client, &[
             ("body", "title created_by created_at"),
             ("order", "created_at desc"),
             ("rating", ">=-10"),
@@ -60,7 +54,7 @@ impl LastCreated {
         }
         Some(format!(
             "\x02{}\x02 ({} ago by {}): http://{}{}", 
-            title, ago, author, self.wiki.root, link
+            title, ago, author, db.wiki.root, link
         ))
     }
 }

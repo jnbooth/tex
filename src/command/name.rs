@@ -5,18 +5,17 @@ use super::*;
 use crate::IO;
 use crate::util::Gender;
 
-use crate::db::establish_connection;
-
 #[derive(Debug, Clone)]
 struct NameList {
     names: Vec<String>,
     dist:  WeightedIndex<i32>
 }
 impl NameList {
-    pub fn build(names: &[db::Name]) -> Result<NameList, WeightedError> {
+    pub fn build(kind: &str, names: &[db::NameGen]) -> Result<NameList, WeightedError> {
+        let names = names.into_iter().filter(|x| x.kind == kind);
         Ok(Self { 
-            names: names.into_iter().map(|x| x.name.to_owned()).collect(),
-            dist:  WeightedIndex::new(names.into_iter().map(|x| x.frequency))?
+            names: names.clone().map(|x| x.name.to_owned()).collect(),
+            dist:  WeightedIndex::new(names.map(|x| x.frequency))?
         })
     }
     pub fn choose<T: Rng>(&self, rng: &mut T) -> String {
@@ -26,9 +25,9 @@ impl NameList {
 
 #[derive(Debug, Clone)]
 pub struct Name {
-    male: NameList,
+    male:   NameList,
     female: NameList,
-    last: NameList
+    last:   NameList
 }
 impl Command for Name {
     fn cmds(&self) -> Vec<String> {
@@ -50,13 +49,13 @@ impl Command for Name {
 }
 
 impl Name {
-    pub fn build() -> IO<Self> {
+    pub fn build(pool: &db::Pool) -> IO<Self> {
         env::load();
-        let conn = establish_connection();
+        let names: Vec<db::NameGen> = db::namegen::table.load(&pool.get()?)?;
         Ok(Self {
-            female: NameList::build(&db::name_female::table.load(&conn)?)?,
-            male:   NameList::build(&db::name_male::table.load(&conn)?)?,
-            last:   NameList::build(&db::name_last::table.load(&conn)?)?
+            female: NameList::build("f", &names)?,
+            male:   NameList::build("m", &names)?,
+            last:   NameList::build("l", &names)?
         })
     }
 
@@ -77,7 +76,7 @@ mod tests {
 
     #[test] #[ignore]
     fn generates_names() {
-        let mut names = Name::build().unwrap();
+        let mut names = Name::build(&db::establish_connection()).unwrap();
         println!("Female: {}", names.test_def("-f").unwrap());
         println!("Male:   {}", names.test_def("-m").unwrap());
         println!("Any:    {}", names.test_def("").unwrap());

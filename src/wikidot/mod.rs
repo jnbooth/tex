@@ -7,9 +7,15 @@ use xmlrpc::Value;
 use crate::{IO, env};
 use crate::db::Page;
 
-pub mod attribution;
-pub mod titles;
-pub mod pages;
+pub mod diff;
+mod authors;
+mod titles;
+mod pages;
+
+pub use self::diff::Diff;
+pub use self::authors::AuthorsDiff;
+pub use self::titles::TitlesDiff;
+pub use self::pages::PagesDiff;
 
 #[derive(Debug, Clone)]
 pub struct Wikidot {
@@ -20,20 +26,22 @@ pub struct Wikidot {
     auth:     String
 }
 
+impl Default for Wikidot { fn default() -> Self { Self::new() } }
 impl Wikidot {
-    pub fn build() -> Option<Self> {
-        let root = env::opt("WIKIDOT_ROOT")?;
-        let site = root.split('.').next()?;
-        let api = env::api("WIKIDOT", "USER", "KEY")?;
+    pub fn new() -> Self {
+        let root = env::get("WIKIDOT_ROOT");
+        let site = root.split('.').next().expect("Invalid WIKIDOT_ROOT field in .env");
+        let api = env::api("WIKIDOT", "USER", "KEY").expect("Missing Wikidot API fields in .env");
         let auth = format!("Basic {}", base64::encode(&format!("{}:{}", api.user, api.key)));
-        Some(Self {
-            ajax:   format!("http://{}.wikidot.com/ajax-module-connector.php", site),
+        Self {
+            ajax:   format!("https://{}.wikidot.com/ajax-module-connector.php", site),
             root:   root.to_owned(),
             rpc:    "https://www.wikidot.com/xml-rpc-api.php".to_owned(),
             site:   site.to_owned(),
             auth
-        })
+        }
     }
+
     fn xml_rpc(&self, cli: &Client, method: &str, params: Vec<(&str, Value)>) 
     -> Result<Value, xmlrpc::Error> {
         let req = cli.post(&self.rpc)
@@ -125,7 +133,7 @@ mod tests {
     #[test] #[ignore]
     fn lists_pages() {
         env::load();
-        let wiki = Wikidot::build().expect("Error loading Wikidot");
+        let wiki = Wikidot::new();
         let list: Vec<String> = wiki.list(&Client::new()).expect("Error loading pages");
         println!("{}", list.len());
     }

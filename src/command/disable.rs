@@ -38,21 +38,19 @@ impl Disable {
     }
     
     pub fn set_enabled(&self, cmd: &str, ctx: &Context, db: &mut Db) -> Result<(), Error> {
+        let conn = db.conn();
         if self.enable {
             db.silences.remove(&ctx.channel, &cmd);
-            db.execute(diesel
-                ::delete(db::silence::table
-                    .filter(db::silence::channel.eq(&ctx.channel))
-                    .filter(db::silence::command.eq(&cmd))
-                )
-            )?;
+            diesel::delete(db::silence::table
+                .filter(db::silence::channel.eq(&ctx.channel))
+                .filter(db::silence::command.eq(&cmd))
+            ).execute(&conn)?;
         } else {
             let silence = db::Silence { channel: ctx.channel.to_owned(), command: cmd.to_owned() };
-            db.execute(diesel
-                ::insert_into(db::silence::table)
+            diesel::insert_into(db::silence::table)
                 .values(&silence)
                 .on_conflict_do_nothing()
-            )?;
+            .execute(&conn)?;
             db.silences.insert(silence);
         }
         Ok(())

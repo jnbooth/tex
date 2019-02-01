@@ -1,69 +1,53 @@
 table! {
-    attribution (page, user) {
-        page -> Varchar,
-        user -> Varchar,
-        kind -> Varchar,
+    attribution (page_id, user) {
+        page_id -> Text,
+        user -> Text,
+        kind -> Text,
     }
 }
 
 table! {
     memo (channel, user) {
-        channel -> Varchar,
-        user -> Varchar,
-        message -> Varchar,
+        channel -> Text,
+        user -> Text,
+        message -> Text,
     }
 }
 
 table! {
-    name_female (name) {
-        name -> Varchar,
+    namegen (kind, name) {
+        kind -> Char,
+        name -> Text,
         frequency -> Int4,
-        probability -> Float8,
     }
 }
 
 table! {
-    name_last (name) {
-        name -> Varchar,
-        frequency -> Int4,
-        probability -> Float8,
-    }
-}
-
-table! {
-    name_male (name) {
-        name -> Varchar,
-        frequency -> Int4,
-        probability -> Float8,
-    }
-}
-
-table! {
-    page (fullname) {
-        fullname -> Varchar,
+    page (id) {
+        id -> Text,
         created_at -> Timestamptz,
-        created_by -> Varchar,
+        created_by -> Text,
         rating -> Int4,
-        title -> Varchar,
+        title -> Text,
     }
 }
 
 table! {
     reminder (id) {
         id -> Int4,
-        user -> Varchar,
+        user -> Text,
         when -> Timestamp,
-        message -> Varchar,
+        message -> Text,
     }
 }
 
 table! {
     seen (channel, user) {
-        channel -> Varchar,
-        user -> Varchar,
-        first -> Varchar,
+        channel -> Text,
+        user -> Text,
+        first -> Text,
         first_time -> Timestamp,
-        latest -> Varchar,
+        latest -> Text,
         latest_time -> Timestamp,
         total -> Int4,
     }
@@ -71,47 +55,39 @@ table! {
 
 table! {
     silence (channel, command) {
-        channel -> Varchar,
-        command -> Varchar,
+        channel -> Text,
+        command -> Text,
     }
 }
 
 table! {
-    tag (name, page) {
-        name -> Varchar,
-        page -> Varchar,
+    tag (page_id, name) {
+        page_id -> Text,
+        name -> Text,
     }
 }
 
 table! {
     tell (id) {
         id -> Int4,
-        target -> Varchar,
-        sender -> Varchar,
+        target -> Text,
+        sender -> Text,
         time -> Timestamp,
-        message -> Varchar,
+        message -> Text,
     }
 }
 
-table! {
-    user (nick) {
-        nick -> Varchar,
-        auth -> Int4,
-        pronouns -> Nullable<Varchar>,
-    }
-}
+joinable!(attribution -> page (page_id));
+joinable!(tag -> page (page_id));
 
 allow_tables_to_appear_in_same_query!(
     attribution,
     memo,
-    name_female,
-    name_last,
-    name_male,
+    namegen,
     page,
     reminder,
     seen,
     silence,
     tag,
     tell,
-    user,
 );

@@ -42,18 +42,6 @@ impl Context {
              time:    SystemTime::now()
         }
     }
-    #[cfg(test)]
-    pub fn admin() -> Self {
-        crate::env::load();
-        Context { 
-             channel: String::default(),
-             nick:    crate::env::get("IRC_NICK").to_owned(),
-             host:    String::default(),
-             user:    crate::env::get("IRC_NICK").to_lowercase(),
-             auth:    5,
-             time:    SystemTime::now()
-        }
-    }
 }
 #[cfg(test)]
 impl Default for Context {

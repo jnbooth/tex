@@ -1,12 +1,7 @@
-#[cfg(test)] 
-use crate::local::LocalMap;
-
 use super::*;
 
 pub struct Memo {
-    shortcut: bool,
-    #[cfg(test)]
-    db: LocalMap<db::Memo>
+    shortcut: bool
 }
 
 impl Command for Memo {
@@ -79,11 +74,7 @@ impl Command for Memo {
 
 impl Memo {
     pub fn new(shortcut: bool) -> Self {
-        Self {
-            shortcut,
-            #[cfg(test)]
-            db: LocalMap::new()
-        }
+        Self { shortcut }
     }
 
     pub fn append(&mut self, s: &str, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> {
@@ -96,61 +87,38 @@ impl Memo {
         Ok(message)
     }
 
-    #[cfg(not(test))]
-    pub fn get(&self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> {
-        Ok(db.first::<db::Memo,_>(
+    pub fn get(&self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> { 
+        Ok(
             db::memo::table
                 .filter(db::memo::channel.eq(&ctx.channel))
                 .filter(db::memo::user.eq(user))
-            )?.message
+            .first::<db::Memo>(&db.conn())?
+            .message
         )
     }
 
-    #[cfg(not(test))]
     pub fn remove(&mut self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> {
-        Ok(db.get_result(diesel
-            ::delete(db::memo::table
+        Ok(
+            diesel::delete(db::memo::table
                 .filter(db::memo::channel.eq(&ctx.channel))
-                .filter(db::memo::user.eq(user))
-            ).returning(db::memo::message)
-        )?)
+                .filter(db::memo::user.eq(user)))
+            .returning(db::memo::message)
+            .get_result(&db.conn())?
+        )
     }
 
-    #[cfg(not(test))]
     pub fn insert(&mut self, message: &str, user: &str, ctx: &Context, db: &Db) -> Result<(), Error> {
         let memo = db::Memo { 
             channel: ctx.channel.to_owned(),
             user:    user.to_owned(),
             message: message.to_owned()
         };
-        db.execute(diesel
-            ::insert_into(db::memo::table)
+        diesel::insert_into(db::memo::table)
             .values(&memo)
             .on_conflict((db::memo::channel, db::memo::user))
             .do_update()
             .set(db::memo::message.eq(message))
-        )?;
-        Ok(())
-    }
-    
-    #[cfg(test)]
-    pub fn get(&self, user: &str, ctx: &Context, _: &Db) -> Result<String, Error> {
-        Ok(self.db.get(&ctx.channel, user).ok_or(NoResults)?.message.to_owned())
-    }
-
-    #[cfg(test)]
-    pub fn remove(&mut self, user: &str, ctx: &Context, _: &Db) -> Result<String, Error> {
-        Ok(self.db.remove(&ctx.channel, user).ok_or(NoResults)?.message)
-    }
-
-    #[cfg(test)]
-    pub fn insert(&mut self, message: &str, user: &str, ctx: &Context, _: &Db) -> Result<(), Error> {
-        let memo = db::Memo { 
-            channel: ctx.channel.to_owned(),
-            user:    user.to_owned(),
-            message: message.to_owned()
-        };
-        self.db.insert(memo);
+            .execute(&db.conn())?;
         Ok(())
     }
 }

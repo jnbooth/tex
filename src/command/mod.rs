@@ -3,7 +3,6 @@ use failure::err_msg;
 use stash::Stash;
 use hashbrown::HashMap;
 
-mod auth;
 mod choose;
 mod define;
 mod disable;
@@ -31,7 +30,6 @@ use crate::error::*;
 use crate::output::Response;
 use crate::output::Response::*;
 use crate::util::own;
-use crate::wikidot::Wikidot;
 
 trait Command {
     fn cmds(&self) -> Vec<String>;
@@ -61,35 +59,33 @@ pub struct Commands {
     usages: HashMap<String, String>
 }
 impl Commands {
-    pub fn new() -> Self {
+    pub fn new(pool: &db::Pool) -> Self {
         let mut x = Self::default();
-        x.store(auth::Auth);
+        x.store(author::Author::new());
         x.store(choose::Choose::new());
         x.store(define::Define::new());
         x.store(forget::Forget);
         x.store(hug::Hug);
+        x.store(lastcreated::LastCreated);
         x.store(quit::Quit);
         x.store(reload::Reload);
         x.store(remindme::Remindme::new());
         x.store(roll::Roll::new());
+        x.store(search::Search::new());
         x.store(seen::Seen);
         x.store(tell::Tell);
         x.store(wikipedia::Wikipedia::new());
         x.store(zyn::Zyn);
+
         for &i in &[false, true] {
             x.store(memo::Memo::new(i));
             if let Some(g) = google::Google::build(i) {
                 x.store(g);
             }
         }
-        match name::Name::build() {
+        match name::Name::build(pool) {
             Err(e)    => println!("Error creating name command: {}", e),
             Ok(names) => x.store(names)
-        }
-        if let Some(wiki) = Wikidot::build() {
-            x.store(lastcreated::LastCreated::new(wiki.clone()));
-            x.store(author::Author::new(wiki.clone()));
-            x.store(search::Search::new(wiki));
         }
         for &i in &[false, true] {
             x.store(disable::Disable::new(i, x.canons.clone()));

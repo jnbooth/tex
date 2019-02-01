@@ -1,14 +1,12 @@
-use diesel::dsl::exists;
 use getopts::{Matches, Options};
+use std::borrow::ToOwned;
 
 use super::*;
 use crate::db::pages;
 use crate::util;
-use crate::wikidot::Wikidot;
 
 pub struct Author {
-    opts: Options,
-    wiki: Wikidot
+    opts: Options
 }
 
 impl Command for Author {
@@ -33,15 +31,20 @@ impl Command for Author {
 }
 
 impl Author {
-    pub fn new(wiki: Wikidot) -> Self {
-        Self { wiki, opts: pages::options() }
+    pub fn new() -> Self {
+        Self { opts: pages::options() }
     }
     
-    fn tally(&self, author_pat: &str, opts: &Matches, db: &Db) -> Result<String, Error> {
-        let authors = Self::authors(author_pat, db)?;
+    fn tally(&self, author_pat: &str, opts: &Matches, db: &mut Db) -> Result<String, Error> {
+        let authors: Vec<String> = db.authors
+            .iter()
+            .filter(|x| x.contains(author_pat))
+            .map(ToOwned::to_owned)
+            .collect();
         let author = match authors.as_slice() {
+            []       => Err(NoResults),
             [author] => Ok(author),
-            _        => Err(NoResults)
+            _        => Err(Ambiguous(authors.len() as i64, authors))
         }?;
         let scps = Self::tagged("scp", author, opts, db)?;
         let tales = Self::tagged("tale", author, opts, db)?;
@@ -70,7 +73,7 @@ impl Author {
             }
         }
 
-        let recent = self.wiki.rate(&latest.fullname, &db.client).ok_or(NoResults)?;
+        let recent = db.wiki.rate(&latest.id, &db.client).ok_or(NoResults)?;
 
         let mut s = "\x02".to_owned();
         s.push_str(author);
@@ -97,22 +100,14 @@ impl Author {
         Ok(s)
     }
 
-    fn authors(author_pat: &str, db: &Db) -> QueryResult<Vec<String>> {
-        db.load(db::page::table
-            .select(db::page::created_by)
-            .filter(db::page::created_by.ilike(format!("%{}%", author_pat)))
-            .distinct_on(db::page::created_by)
-        )
-    }
-
     fn tagged(tag: &str, author: &str, opts: &Matches, db: &Db) -> Result<Vec<db::Page>, Error> {
-        Ok(db.load(pages::filter_by(author, pages::filter(opts, db::page::table
-                .filter(exists(
+        Ok(pages::filter_by(author, pages::filter(opts, db::page::table
+                .filter(db::page::id.eq_any(
                     db::tag::table
-                        .filter(db::tag::page.eq(db::page::fullname))
+                        .select(db::tag::page_id)
                         .filter(db::tag::name.eq(tag))
                 ))
-            )?))?
+            )?).load(&db.conn())?
         )
     }
 }

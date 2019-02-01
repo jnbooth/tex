@@ -22,6 +22,12 @@ diesel migration run
 
 Once complete, the SQL server is safe to shut down.
 
+Similarly, to clear wiki information without deleting anything else, start up the SQL server again and use:
+
+~~~
+diesel migration redo
+~~~
+
 ### Building
 
 To build and run the project, use `cargo run --release`. To run it in local offline mode, use `cargo run --release -- -o`. To build without running it, use `cargo build --release`. Note that the first time building the project will take much longer in order to download and compile dependencies. 

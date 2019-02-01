@@ -1,23 +1,23 @@
-CREATE TABLE "attribution" (
-  "page"  CHARACTER VARYING  NOT NULL,
-  "user"  CHARACTER VARYING  NOT NULL,
-  "kind"  CHARACTER VARYING  NOT NULL,
-  PRIMARY KEY ("page", "user")
-);
-CREATE INDEX ON "attribution" ("user");
-
 CREATE TABLE "page" (
-  "fullname" CHARACTER VARYING  PRIMARY KEY,
-  "created_at" TIMESTAMP WITH TIME ZONE  NOT NULL,
-  "created_by" CHARACTER VARYING  NOT NULL,
-  "rating" INTEGER  NOT NULL,
-  "title" CHARACTER VARYING  NOT NULL
+  "id"          text  PRIMARY KEY,
+  "created_at"  timestamp with time zone  NOT NULL,
+  "created_by"  text  NOT NULL,
+  "rating"      integer  NOT NULL,
+  "title"       text  NOT NULL
 );
 CREATE INDEX ON "page" ("created_by");
 
+CREATE TABLE "attribution" (
+  "page_id"  text  NOT NULL  REFERENCES "page"("id")  ON DELETE CASCADE,
+  "user"     text  NOT NULL,
+  "kind"     text  NOT NULL,
+  PRIMARY KEY ("page_id", "user")
+);
+CREATE INDEX ON "attribution" ("user");
+
 CREATE TABLE "tag" (
-  "name" CHARACTER VARYING  NOT NULL,
-  "page" CHARACTER VARYING  NOT NULL,
-  PRIMARY KEY ("name", "page")
+  "page_id"  text  NOT NULL  REFERENCES "page"("id")  ON DELETE CASCADE,
+  "name"     text  NOT NULL,
+  PRIMARY KEY ("page_id", "name")
 );
 CREATE INDEX ON "tag" ("name");

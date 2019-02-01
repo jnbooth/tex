@@ -1,44 +1,38 @@
 CREATE TABLE "memo" (
-  "channel" CHARACTER VARYING  NOT NULL,
-  "user"    CHARACTER VARYING  NOT NULL,
-  "message" CHARACTER VARYING  NOT NULL,
+  "channel"  TEXT  NOT NULL,
+  "user"     TEXT  NOT NULL,
+  "message"  TEXT  NOT NULL,
   PRIMARY KEY ("channel", "user")
 );
 
 CREATE TABLE "reminder" (
-  "id"      SERIAL  PRIMARY KEY,
-  "user"    CHARACTER VARYING  NOT NULL,
-  "when"    TIMESTAMP  NOT NULL,
-  "message" CHARACTER VARYING  NOT NULL
+  "id"       serial  PRIMARY KEY,
+  "user"     text  NOT NULL,
+  "when"     timestamp  NOT NULL,
+  "message"  text  NOT NULL
 );
 
 CREATE TABLE "seen" (
-  "channel"     CHARACTER VARYING  NOT NULL,
-  "user"        CHARACTER VARYING  NOT NULL,
-  "first"       CHARACTER VARYING  NOT NULL,
-  "first_time"  TIMESTAMP  NOT NULL,
-  "latest"      CHARACTER VARYING  NOT NULL,
-  "latest_time" TIMESTAMP  NOT NULL,
-  "total"       INT  NOT NULL  DEFAULT 1,
+  "channel"      text  NOT NULL,
+  "user"         text  NOT NULL,
+  "first"        text  NOT NULL,
+  "first_time"   timestamp  NOT NULL  DEFAULT current_timestamp,
+  "latest"       text  NOT NULL,
+  "latest_time"  timestamp  NOT NULL  DEFAULT current_timestamp,
+  "total"        int  NOT NULL  DEFAULT 1,
   PRIMARY KEY ("channel", "user")
 );
 
 CREATE TABLE "silence" (
-  "channel" CHARACTER VARYING  NOT NULL, 
-  "command" CHARACTER VARYING  NOT NULL,
+  "channel"  text  NOT NULL, 
+  "command"  text  NOT NULL,
   PRIMARY KEY ("channel", "command")
 );
 
 CREATE TABLE "tell" (
-  "id"      SERIAL  PRIMARY KEY,
-  "target"  CHARACTER VARYING  NOT NULL,
-  "sender"  CHARACTER VARYING  NOT NULL,
-  "time"    TIMESTAMP  NOT NULL,
-  "message" CHARACTER VARYING  NOT NULL
-);
-
-CREATE TABLE "user" (
-  "nick"     CHARACTER VARYING  PRIMARY KEY,
-  "auth"     INT  NOT NULL  DEFAULT 0,
-  "pronouns" CHARACTER VARYING
+  "id"       serial  PRIMARY KEY, 
+  "target"   text  NOT NULL,
+  "sender"   text  NOT NULL,
+  "time"     timestamp  NOT NULL,
+  "message"  text  NOT NULL
 );

@@ -1,4 +1,4 @@
-use diesel::dsl::{exists, not};
+use diesel::dsl::not;
 use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::query_builder::BoxedSelectStatement;
@@ -28,9 +28,10 @@ pub fn filter_by<'a, T>(author: &str, query: BoxedSelectStatement<'a, T, db::pag
 -> BoxedSelectStatement<'a, T, db::page::table, Pg> {
     query.filter(
         db::page::created_by.eq(author.to_owned())
-        .or(exists(db::attribution::table
-            .filter(db::attribution::page.eq(db::page::fullname))
-            .filter(db::attribution::user.eq(author.to_owned()))
+        .or(db::page::id.eq_any(
+            db::attribution::table
+                .select(db::attribution::page_id)
+                .filter(db::attribution::user.eq(author.to_owned()))
         ))
     )
 }
@@ -45,9 +46,9 @@ where B: QueryDsl + BoxedDsl<'a, Pg, Output = BoxedSelectStatement<'a, T, db::pa
     }
 
     for tag in opts.opt_strs("t") {
-        query = query.filter(exists(
+        query = query.filter(db::page::id.eq_any(
             db::tag::table
-                .filter(db::tag::page.eq(db::page::fullname))
+                .select(db::tag::page_id)
                 .filter(db::tag::name.eq(tag))
         ));
     }
