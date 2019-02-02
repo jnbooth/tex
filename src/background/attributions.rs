@@ -19,13 +19,15 @@ fn parse(tr: Node) -> Option<Attribution> {
     Some(Attribution { page_id, user, kind })
 }
 
-pub fn update(cli: &Client, conn: &Conn, _: &Wikidot) -> IO<()> {
-    let doc = Document::from_read(cli.get(URL).send()?)?;
-    let attrs: Vec<Attribution> = doc
-        .find(Class("wiki-content-table").descendant(Name("tr")))
+fn parse_all(doc: &Document) -> Vec<Attribution> {
+    doc .find(Class("wiki-content-table").descendant(Name("tr")))
         .filter_map(parse)
         .filter(|x| x.kind != "maintainer")
-        .collect();
+        .collect()
+}
+
+pub fn update(cli: &Client, conn: &Conn, _: &Wikidot) -> IO<()> {
+    let attrs = parse_all(&Document::from_read(cli.get(URL).send()?)?);
     diesel::insert_into(attribution::table)
         .values(&attrs)
         .on_conflict_do_nothing()

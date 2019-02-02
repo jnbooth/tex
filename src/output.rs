@@ -33,13 +33,6 @@ impl Response {
 pub trait Output {
     fn auth(&self, ctx: &Context) -> u8;
     fn respond(&self, ctx: &Context, response: Response) -> Result<(), IrcError>;
-    fn warn(owner: &Option<String>, msg: &str) -> String {
-        log(WARN, msg);
-        match owner {
-            None    => "Something went wrong.".to_owned(),
-            Some(s) => format!("Something went wrong. Please let {} know.", s)
-        }
-    }
 }
 
 fn access(irc: &IrcClient, ctx: &Context) -> Option<AccessLevel> {
@@ -69,7 +62,7 @@ impl Output for IrcClient {
                 self.send_action(&ctx.channel, msg)
             },
             Ban(msg) => {
-                log(WARN, &format!(
+                log(WARNING, &format!(
                     "{}! Banning {} from {}: {}", ctx.since(), ctx.nick, ctx.channel, msg
                 ));
                 self.send_kick(&ctx.channel, &ctx.nick, msg)?;
@@ -108,7 +101,7 @@ impl Output for Offline {
                 Ok(())
             },
             Ban(msg) => {
-                log(WARN, &format!(
+                log(WARNING, &format!(
                     "{}! Banning {} from {}: {}", ctx.since(), ctx.nick, ctx.channel, msg
                 ));
                 Ok(())

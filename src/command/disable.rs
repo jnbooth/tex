@@ -73,7 +73,7 @@ mod tests {
         !db.silences.contains(&Context::default().channel, cmd)
     }
 
-    #[test]
+    #[test] #[ignore]
     fn disables() {
         let mut db = Db::default();
         let mut enable = new(true);
@@ -83,7 +83,7 @@ mod tests {
         assert!(!is_enabled(CMD, &db));
     }
 
-    #[test]
+    #[test] #[ignore]
     fn enables() {
         let mut db = Db::default();
         let mut disable = new(false);

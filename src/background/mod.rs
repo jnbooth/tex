@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use crate::IO;
 use crate::db::{Conn, Db, Pool, timer};
 use crate::wikidot::Wikidot;
-use crate::logging::{INFO, Logged, log};
+use crate::logging::*;
 
 mod attributions;
 mod pages;
@@ -21,7 +21,7 @@ pub fn spawn(pool: Pool, db: &mut Db) -> IO<()> {
     thread("attributions", pool.clone(), attributions::update);
     thread("pages", pool.clone(), pages::update);
 
-    let (mut titles, titles_r) = TitlesDiff::build(&Client::new())?;
+    let (mut titles, titles_r) = TitlesDiff::build(&db.client)?;
     db.titles   = titles.cache().clone().into_iter().collect();
     db.titles_r = Some(titles_r);
     thread("titles", pool, move |cli,_,_| titles.diff(cli));

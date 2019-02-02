@@ -27,7 +27,7 @@ mod search;
 use crate::{Context, db, env};
 use crate::db::{Db, Pool};
 use crate::error::*;
-use crate::logging::{WARN, log};
+use crate::logging::*;
 use crate::output::{Output, Response};
 use crate::output::Response::*;
 use crate::util::own;
@@ -85,7 +85,7 @@ impl Commands {
             }
         }
         match name::Name::build(pool) {
-            Err(e)    => log(WARN, &format!("Error creating name command: {}", e)),
+            Err(e)    => log(ERROR, &format!("Error creating name command: {}", e)),
             Ok(names) => x.store(names)
         }
         for &i in &[false, true] {

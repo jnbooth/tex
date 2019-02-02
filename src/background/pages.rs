@@ -13,8 +13,7 @@ pub fn update(cli: &Client, conn: &Conn, wiki: &Wikidot) -> IO<()> {
     let updated = SystemTime::now();
     let mut pages = Vec::new();
     let mut tags = Vec::new();
-    let titles: Vec<String> = wiki.list(cli)?;
-    wiki.walk(updated, &titles, cli, |page, mut pagetags| {
+    wiki.walk(updated, &wiki.list(cli)?, cli, |page, mut pagetags| {
         pages.push(page);
         tags.append(&mut pagetags);
         Ok(())

@@ -83,7 +83,7 @@ mod tests {
         db
     }
 
-    #[test]
+    #[test] #[ignore]
     fn first() {
         let ctx = ctx_test();
         assert_eq!(
@@ -92,7 +92,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[test] #[ignore]
     fn latest() {
         let ctx = ctx_test();
         assert_eq!(
@@ -101,7 +101,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[test] #[ignore]
     fn total() {
         let ctx = ctx_test();
         assert_eq!(
@@ -110,7 +110,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[test] #[ignore]
     fn compound() {
         let ctx = ctx_test();
         let fake = Context::mock("#!!", &ctx.user);
@@ -121,7 +121,7 @@ mod tests {
     }
 
 
-    #[test]
+    #[test] #[ignore]
     fn privmsg_is_none() {
         let ctx = Context::mock("@A", "@A");
         let mut db = Db::default();
@@ -129,13 +129,14 @@ mod tests {
         assert!(search(&[&ctx.nick], &ctx, &db_test()).is_err());
     }
 
-    #[test]
+    #[test] #[ignore]
     fn unseen_is_none() {
         let ctx = Context::mock("@A", "#@");
         assert!(search(&[&ctx.nick], &ctx, &Db::default()).is_err());
     }
 
-    #[test]
+
+    #[test] #[ignore]
     fn different_channel_is_none() {
         let ctx = Context::mock("@A", "#@");
         let fake = Context::mock("#!!", &ctx.user);

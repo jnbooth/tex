@@ -1,5 +1,5 @@
 use irc::error::IrcError;
-use irc::proto::Command::*;
+use irc::proto::Command::{JOIN, PRIVMSG};
 use irc::proto::message;
 use std::borrow::ToOwned;
 use std::iter::*;
@@ -29,7 +29,7 @@ pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O
                         Some(xs) => match xs.get_ban(&ctx) {
                             None         => print!("{}", text),
                             Some(reason) => {
-                                log_part(WARN, &text);
+                                log_part(WARNING, &text);
                                 irc.respond(&ctx, Ban(reason))?;
                             }
                         }
@@ -139,15 +139,15 @@ fn run<O: Output>(cmds: &mut Commands, message: &str, ctx: &Context, db: &mut Db
                 }
             },
             Err(Unauthorized) => {
-                log(WARN, &format!("{} used an unauthorized command: {}", ctx.nick, cmd)); 
+                log(WARNING, &format!("{} used an unauthorized command: {}", ctx.nick, cmd)); 
                 Ok(()) 
             },
             Err(ParseErr(e)) => {
-                log(crate::logging::INFO, &format!("Parse error for '{}': {}", message, e));
+                log(INFO, &format!("Parse error for '{}': {}", message, e));
                 irc.respond(ctx, Reply(NO_RESULTS.to_owned()))
             },
             Err(Throw(e)) => {
-                log(crate::logging::INFO, &format!("Unhandled error for '{}': {}", message, e));
+                log(ERROR, &format!("Unhandled error for '{}': {}", message, e));
                 irc.respond(ctx, Reply(
                         format!("Something went wrong. Please let {} know.", db.owner)
                 ))

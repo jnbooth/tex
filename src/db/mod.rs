@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use diesel::query_dsl::{LoadQuery, RunQueryDsl};
+use diesel::query_dsl::RunQueryDsl;
 use diesel::pg::PgConnection;
 use diesel::pg::upsert::excluded;
 use diesel::r2d2::ConnectionManager;
@@ -19,7 +19,7 @@ pub mod pages;
 mod schema;
 
 use crate::background::diff::DiffReceiver;
-use crate::logging::Logged;
+use crate::logging::*;
 use crate::local::LocalMap;
 use crate::{Context, env, util};
 use crate::output::Output;
@@ -114,11 +114,14 @@ impl Db {
         }
     }
     
+    #[cfg(not(test))]
     fn retrieve<Frm, To, C, L, F>(&self, table: L, f: F) -> QueryResult<C>
-    where C: FromIterator<To>, L: LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
+    where C: FromIterator<To>, L: diesel::query_dsl::LoadQuery<PgConnection, Frm>, F: Fn(Frm) -> To {
         Ok(table.load::<Frm>(&self.conn())?.into_iter().map::<To, F>(f).collect())
     }
 
+
+    #[cfg(not(test))]
     pub fn reload(&mut self) -> QueryResult<()> {
         let conn = self.conn();
         #[cfg(not(test))] { self.bans = Bans::build(); }
@@ -127,6 +130,11 @@ impl Db {
             (reminder::table, |x| (x.user.to_owned(), Reminder::from(x)))?;
         self.tells = self.retrieve::<DbTell,_,_,_,_>
             (tell::table, |x| (x.target.to_owned(), Tell::from(x)))?;
+        Ok(())
+    }
+    #[cfg(test)]
+    pub fn reload(&mut self) -> QueryResult<()> {
+        self.owner_ = self.owner.to_lowercase();
         Ok(())
     }
 
@@ -201,10 +209,18 @@ impl Db {
     }
 }
 
+#[cfg(not(test))]
 pub fn establish_connection() -> Pool {
-    let manager = ConnectionManager::new(env::get("DATABASE_URL"));
     r2d2::Pool::builder()
         .max_size(env::get("DATABASE_POOL").parse().expect("Invalid DATABASE_POOL number"))
-        .build(manager)
+        .build(ConnectionManager::new(env::get("DATABASE_URL")))
         .expect("Error connecting to database")
+}
+
+#[cfg(test)]
+pub fn establish_connection() -> Pool {
+    r2d2::Pool::builder()
+        .max_size(1)
+        .connection_timeout(std::time::Duration::new(0, 1))
+        .build_unchecked(ConnectionManager::new(""))
 }

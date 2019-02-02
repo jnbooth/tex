@@ -3,6 +3,7 @@ use reqwest::Client;
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Class, Name, Predicate, Text};
+use std::iter::*;
 
 use crate::IO;
 use super::diff::{Diff, DiffResult, DiffSender};
@@ -20,20 +21,15 @@ impl Diff<(String, String)> for TitlesDiff {
         &self.titles
     }
     fn refresh(&self, cli: &Client) -> IO<HashSet<(String, String)>> {
-        let mut pages: Vec<String> = (2..6)
-            .map(|i| format!("http://scp-wiki.wikidot.com/scp-series-{}", i))
-            .collect();
-        pages.push("http://scp-wiki.wikidot.com/scp-series".to_string());
-        pages.push("http://www.scp-wiki.net/joke-scps".to_string());
         let mut titles = HashSet::new();
-        for page in pages {
-            let doc = Document::from_read(cli.get(&page).send()?)?;
-            for el in doc.find(Class("series").descendant(Name("li"))) {
-                if let Some((k, v)) = parse_title(&el) {
-                    if v != "[ACCESS DENIED]" {
-                        titles.insert((k, v));
-                    }
-                }
+
+        try_page("http://scp-wiki.wikidot.com/joke-scps", cli, &mut titles)?;
+        try_page("http://scp-wiki.wikidot.com/scp-series", cli, &mut titles)?;
+
+        for page in (2..).map(|i| format!("http://scp-wiki.wikidot.com/scp-series-{}", i)) {
+            match try_page(&page, cli, &mut titles) {
+                Ok(true) => (),
+                _        => break
             }
         }
         Ok(titles)
@@ -44,6 +40,23 @@ impl Diff<(String, String)> for TitlesDiff {
     fn update(&mut self, titles: HashSet<(String, String)>) {
         self.titles = titles;
     }
+}
+
+fn try_page(page: &str, cli: &Client, titles: &mut HashSet<(String, String)>) -> IO<bool> {
+    Ok(parse_page(&Document::from_read(cli.get(page).send()?)?, titles))
+}
+
+fn parse_page(doc: &Document, titles: &mut HashSet<(String, String)>) -> bool {
+    let mut changed = false;
+    for el in doc.find(Class("series").descendant(Name("li"))) {
+        if let Some((k, v)) = parse_title(&el) {
+            if v != "[ACCESS DENIED]" {
+                titles.insert((k, v));
+                changed = true;
+            }
+        }
+    }
+    changed
 }
 
 fn parse_title(node: &Node) -> Option<(String, String)> {

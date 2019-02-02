@@ -1,10 +1,35 @@
 use std::fmt::Debug;
 
-pub const INFO: u8 = 34;
-pub const WARN: u8 = 33;
+pub use self::Level::*;
 
-pub const ECHO: u8 = 32;
-pub const ASK:  u8 = 37;
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Level {
+    ERROR,
+    WARNING,
+    INFO,
+
+    ECHO,
+    ASK
+}
+
+fn color(lvl: Level) -> u8 {
+    match lvl {
+        ERROR   => 31,
+        WARNING => 33,
+        INFO    => 34,
+        ECHO    => 32,
+        ASK     => 37
+    }
+}
+
+fn label(lvl: Level) -> &'static str {
+    match lvl {
+        ERROR   => "ERROR: ",
+        WARNING => "WARNING: ",
+        INFO    => "INFO: ",
+        _       => ""
+    }
+}
 
 #[inline] 
 fn clean(s: &str) -> String {
@@ -12,12 +37,12 @@ fn clean(s: &str) -> String {
 }
 
 #[inline]
-pub fn log(code: u8, s: &str) {
-    println!("\x1b[{}m{}\x1b[0m", code, clean(s));
+pub fn log(lvl: Level, s: &str) {
+    println!("\x1b[{}m{}{}\x1b[0m", color(lvl), label(lvl), clean(s));
 }
 #[inline]
-pub fn log_part(code: u8, s: &str) {
-    print!("\x1b[{}m{}\x1b[0m", code, clean(s));
+pub fn log_part(lvl: Level, s: &str) {
+    print!("\x1b[{}m{}{}\x1b[0m", color(lvl), label(lvl), clean(s));
 }
 
 pub trait Logged {
@@ -27,7 +52,7 @@ pub trait Logged {
 impl<T, E: Debug> Logged for Result<T, E> {
     fn log(self, label: &str) {
         if let Err(e) = self {
-            println!("\x1b[{}m{}: {:?}\x1b[0m", WARN, label, e);
+            log(ERROR, &format!("{}: {:?}", label, e));
         }
     }
 }

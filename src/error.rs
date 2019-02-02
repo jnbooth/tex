@@ -57,3 +57,8 @@ impl From<std::time::SystemTimeError> for Error {
         Throw(failure::Error::from(e))
     }
 }
+impl From<xmlrpc::Error> for Error {
+    fn from(e: xmlrpc::Error) -> Self {
+        Throw(failure::Error::from(e))
+    }
+}

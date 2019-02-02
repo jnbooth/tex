@@ -21,7 +21,7 @@ mod tests {
     use super::*;
     use crate::db::{Reminder, Silence, Tell};
 
-    #[test]
+    #[test] #[ignore]
     fn clears_silences() {
         let mut db = Db::default();
         db.silences.insert(Silence::default());
@@ -29,7 +29,7 @@ mod tests {
         assert!(db.silences.is_empty());
     }
 
-    #[test]
+    #[test] #[ignore]
     fn clears_reminders() {
         let mut db = Db::default();
         db.reminders.insert("".to_owned(), Reminder::default());
@@ -37,7 +37,7 @@ mod tests {
         assert!(db.reminders.is_empty());
     }
 
-    #[test]
+    #[test] #[ignore]
     fn clears_tells() {
         let mut db = Db::default();
         db.tells.insert("".to_owned(), Tell::default());
