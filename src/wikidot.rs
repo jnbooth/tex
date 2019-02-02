@@ -2,20 +2,11 @@ use reqwest::Client;
 use reqwest::header::AUTHORIZATION;
 use select::document::Document;
 use std::iter::*;
+use std::time::SystemTime;
 use xmlrpc::Value;
 
 use crate::{IO, env};
-use crate::db::Page;
-
-pub mod diff;
-mod authors;
-mod titles;
-mod pages;
-
-pub use self::diff::Diff;
-pub use self::authors::AuthorsDiff;
-pub use self::titles::TitlesDiff;
-pub use self::pages::PagesDiff;
+use crate::db::{Page, Tag};
 
 #[derive(Debug, Clone)]
 pub struct Wikidot {
@@ -93,12 +84,12 @@ impl Wikidot {
             ("pages", Value::Array(vec![Value::from(title.to_owned())]))
         ]).ok()?;
         let (_, page) = res.as_struct()?.iter().next()?;
-        Some(i64::from(Page::build(page)?.rating))
+        Some(i64::from(Page::build(page, SystemTime::now())?.rating))
     }
 
-    #[cfg(not(test))]
-    pub fn walk<T, F>(&self, titles: &[String], cli: &Client, mut f: F) -> IO<()> 
-    where T: FromIterator<String>, F: FnMut(&str, Page, T) -> IO<()> {
+    pub fn walk<T, F>(&self, updated: SystemTime, titles: &[String], cli: &Client, mut f: F) 
+    -> IO<()> 
+    where T: FromIterator<Tag>, F: FnMut(Page, T) -> IO<()> {
         for chunk in titles.chunks(10) {
             let pages = chunk.into_iter().map(|x| Value::from(x.to_owned())).collect();
             let res = self.xml_rpc(&cli, "pages.get_meta", vec![
@@ -106,18 +97,13 @@ impl Wikidot {
                 ("pages", Value::Array(pages))
             ])?;
             let obj = res.as_struct().ok_or_else(||failure::err_msg("Invalid response"))?;
-            for (k, v) in obj {
-                if let Some((pg, tags)) = Page::tagged(v) {
-                    f(k, pg, tags)?;
+            for v in obj.values() {
+                if let Some((pg, tags)) = Page::tagged(v, updated) {
+                    f(pg, tags)?;
                 }
             }
         }
 
-        Ok(())
-    }
-    #[cfg(test)]
-    pub fn walk<T, F>(&self, _: &[String], _: &Client, _: F) -> IO<()> 
-    where T: FromIterator<String>, F: FnMut(&str, Page, T) -> IO<()> {
         Ok(())
     }
 }

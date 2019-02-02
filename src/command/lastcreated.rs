@@ -17,7 +17,7 @@ impl Command for LastCreated {
     }
     fn usage(&self) -> String { "".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 0 }
-    fn auth(&self) -> i32 { 0 }
+    fn auth(&self) -> u8 { 0 }
 
     fn run(&mut self, _: &[&str], _: &Context, db: &mut Db) -> Outcome {
         self.last_created(&db)

@@ -1,29 +1,25 @@
 use irc::client::prelude::*;
 use std::time::SystemTime;
 
-use crate::db::Db;
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Context {
     pub channel: String,
     pub nick:    String,
     pub host:    String,
     pub user:    String,
-    pub auth:    i32,
     pub time:    SystemTime
 }
 
 impl Context {
-    pub fn build(db: &Db, message: Message) -> Option<Context> {
+    pub fn build(message: Message) -> Option<Context> {
         let channel = message.response_target()?.to_lowercase();
         let prefix  = message.prefix?.to_owned();
         let nick    = prefix.split('!').next()?.to_owned();
         let host    = prefix.split('@').last()?.to_owned();
         let user    = nick.to_lowercase();
-        let auth    = db.auth(&user);
         let time    = SystemTime::now();
 
-        Some(Self { channel, nick, host, user, auth, time })
+        Some(Self { channel, nick, host, user, time })
     }
     pub fn since(&self) -> String {
         match self.time.elapsed() {
@@ -38,7 +34,6 @@ impl Context {
              nick:    nick.to_owned(),
              host:    String::new(),
              user:    nick.to_lowercase(),
-             auth:    0,
              time:    SystemTime::now()
         }
     }
@@ -51,7 +46,6 @@ impl Default for Context {
              nick:    String::default(),
              host:    String::default(),
              user:    String::default(),
-             auth:    i32::default(),
              time:    SystemTime::now()
         }
     }

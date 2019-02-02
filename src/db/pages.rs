@@ -5,7 +5,8 @@ use diesel::query_builder::BoxedSelectStatement;
 use diesel::query_dsl::methods::BoxedDsl;
 use getopts::{Options, Matches};
 
-use crate::{db, util};
+use crate::util;
+use crate::db::{attribution, page, tag};
 use crate::error::Error;
 use crate::error::Error::*;
 
@@ -24,37 +25,37 @@ pub fn options() -> Options {
 }
 
 
-pub fn filter_by<'a, T>(author: &str, query: BoxedSelectStatement<'a, T, db::page::table, Pg>)
--> BoxedSelectStatement<'a, T, db::page::table, Pg> {
+pub fn filter_by<'a, T>(author: &str, query: BoxedSelectStatement<'a, T, page::table, Pg>)
+-> BoxedSelectStatement<'a, T, page::table, Pg> {
     query.filter(
-        db::page::created_by.eq(author.to_owned())
-        .or(db::page::id.eq_any(
-            db::attribution::table
-                .select(db::attribution::page_id)
-                .filter(db::attribution::user.eq(author.to_owned()))
+        page::created_by.eq(author.to_owned())
+        .or(page::id.eq_any(
+            attribution::table
+                .filter(attribution::user.eq(author.to_owned()))
+                .select(attribution::page_id)
         ))
     )
 }
 
 pub fn filter<'a, B, T>(opts: &Matches, q: B)
--> Result<BoxedSelectStatement<'a, T, db::page::table, Pg>, Error> 
-where B: QueryDsl + BoxedDsl<'a, Pg, Output = BoxedSelectStatement<'a, T, db::page::table, Pg>> {
+-> Result<BoxedSelectStatement<'a, T, page::table, Pg>, Error> 
+where B: QueryDsl + BoxedDsl<'a, Pg, Output = BoxedSelectStatement<'a, T, page::table, Pg>> {
     let mut query = q.into_boxed();
     
     for free in &opts.free {
-        query = query.filter(db::page::title.ilike(format!("%{}%", free)));
+        query = query.filter(page::title.ilike(format!("%{}%", free)));
     }
 
     for tag in opts.opt_strs("t") {
-        query = query.filter(db::page::id.eq_any(
-            db::tag::table
-                .select(db::tag::page_id)
-                .filter(db::tag::name.eq(tag))
+        query = query.filter(page::id.eq_any(
+            tag::table
+                .filter(tag::name.eq(tag))
+                .select(tag::page_id)
         ));
     }
 
     for tag in opts.opt_strs("e") {
-        query = query.filter(not(db::page::title.ilike(format!("%{}%", tag))));
+        query = query.filter(not(page::title.ilike(format!("%{}%", tag))));
     }
 
     
@@ -64,12 +65,12 @@ where B: QueryDsl + BoxedDsl<'a, Pg, Output = BoxedSelectStatement<'a, T, db::pa
 
     if let Some(before) = opts.opt_str("<") {
         let date = util::parse_date(&before).ok_or(InvalidArgs)?;
-        query = query.filter(db::page::created_at.lt(date));
+        query = query.filter(page::created_at.lt(date));
     }
 
     if let Some(after) = opts.opt_str(">") {
         let date = util::parse_date(&after).ok_or(InvalidArgs)?;
-        query = query.filter(db::page::created_at.gt(date));
+        query = query.filter(page::created_at.gt(date));
     }
     Ok(query)
 }

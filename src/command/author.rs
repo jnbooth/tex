@@ -2,7 +2,7 @@ use getopts::{Matches, Options};
 use std::borrow::ToOwned;
 
 use super::*;
-use crate::db::pages;
+use crate::db::{Conn, Page, attribution, page, pages, tag};
 use crate::util;
 
 pub struct Author {
@@ -15,7 +15,7 @@ impl Command for Author {
     }
     fn usage(&self) -> String { "[<author>] [-t <tag>] [-t <another>] [-< <before MM-DD-YYYY>] [-> <after MM-DD-YYYY>] [-e <exclude>] [-e <another>]".to_owned() }
     fn fits(&self, _: usize) -> bool { true }
-    fn auth(&self) -> i32 { 0 }
+    fn auth(&self) -> u8 { 0 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let mut opts = self.opts.parse(args)?;
@@ -36,28 +36,34 @@ impl Author {
     }
     
     fn tally(&self, author_pat: &str, opts: &Matches, db: &mut Db) -> Result<String, Error> {
-        let authors: Vec<String> = db.authors
-            .iter()
-            .filter(|x| x.contains(author_pat))
-            .map(ToOwned::to_owned)
-            .collect();
+        let conn = db.conn();
+        let mut authors = page::table
+            .filter(page::created_by.ilike(author_pat))
+            .select(page::created_by)
+            .load(&conn)?;
+        authors.append(&mut attribution::table
+            .filter(attribution::user.ilike(author_pat))
+            .select(attribution::user)
+            .load(&conn)?
+        );
+        authors.dedup();
         let author = match authors.as_slice() {
             []       => Err(NoResults),
             [author] => Ok(author),
             _        => Err(Ambiguous(authors.len() as i64, authors))
         }?;
-        let scps = Self::tagged("scp", author, opts, db)?;
-        let tales = Self::tagged("tale", author, opts, db)?;
-        let gois = Self::tagged("goi-format", author, opts, db)?;
-        let hubs = Self::tagged("hub", author, opts, db)?;
-        let art = Self::tagged("artwork", author, opts, db)?;
+        let scps = Self::tagged("scp", author, opts, &conn)?;
+        let tales = Self::tagged("tale", author, opts, &conn)?;
+        let gois = Self::tagged("goi-format", author, opts, &conn)?;
+        let hubs = Self::tagged("hub", author, opts, &conn)?;
+        let art = Self::tagged("artwork", author, opts, &conn)?;
         let scps_len = scps.len();
         let tales_len = tales.len();
         let gois_len = gois.len();
         let hubs_len = hubs.len();
         let art_len = art.len();
 
-        let mut all: Vec<db::Page> = [scps, tales, gois, hubs, art].concat();
+        let mut all: Vec<Page> = [scps, tales, gois, hubs, art].concat();
         all.sort();
         all.dedup();
 
@@ -92,7 +98,7 @@ impl Author {
         s.push_str("\x02 net votes with an average of \x02");
         s.push_str(&util::rating(votes / all_len as i64));
         s.push_str("\x02. Their latest page is \x02");
-        s.push_str(&latest.title);
+        s.push_str(&db.title(&latest));
         s.push_str("\x02 at \x02");
         s.push_str(&util::rating(recent));
         s.push_str("\x02.");
@@ -100,14 +106,15 @@ impl Author {
         Ok(s)
     }
 
-    fn tagged(tag: &str, author: &str, opts: &Matches, db: &Db) -> Result<Vec<db::Page>, Error> {
-        Ok(pages::filter_by(author, pages::filter(opts, db::page::table
-                .filter(db::page::id.eq_any(
-                    db::tag::table
-                        .select(db::tag::page_id)
-                        .filter(db::tag::name.eq(tag))
+    fn tagged(tag: &str, author: &str, opts: &Matches, conn: &Conn) 
+    -> Result<Vec<Page>, Error> {
+        Ok(pages::filter_by(author, pages::filter(opts, page::table
+                .filter(page::id.eq_any(
+                    tag::table
+                        .select(tag::page_id)
+                        .filter(tag::name.eq(tag))
                 ))
-            )?).load(&db.conn())?
+            )?).load(conn)?
         )
     }
 }

@@ -25,16 +25,17 @@ mod author;
 mod search;
 
 use crate::{Context, db, env};
-use crate::db::Db;
+use crate::db::{Db, Pool};
 use crate::error::*;
-use crate::output::Response;
+use crate::logging::{WARN, log};
+use crate::output::{Output, Response};
 use crate::output::Response::*;
 use crate::util::own;
 
 trait Command {
     fn cmds(&self) -> Vec<String>;
     fn usage(&self) -> String;
-    fn auth(&self) -> i32;
+    fn auth(&self) -> u8;
     fn fits(&self, size: usize) -> bool;
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome;
     
@@ -59,7 +60,7 @@ pub struct Commands {
     usages: HashMap<String, String>
 }
 impl Commands {
-    pub fn new(pool: &db::Pool) -> Self {
+    pub fn new(pool: &Pool) -> Self {
         let mut x = Self::default();
         x.store(author::Author::new());
         x.store(choose::Choose::new());
@@ -84,7 +85,7 @@ impl Commands {
             }
         }
         match name::Name::build(pool) {
-            Err(e)    => println!("Error creating name command: {}", e),
+            Err(e)    => log(WARN, &format!("Error creating name command: {}", e)),
             Ok(names) => x.store(names)
         }
         for &i in &[false, true] {
@@ -116,7 +117,8 @@ impl Commands {
         }
     }
 
-    pub fn run(&mut self, cmd: &str, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
+    pub fn run<T: Output>(&mut self, cmd: &str, args: &[&str], ctx: &Context, db: &mut Db, irc: &T) 
+    -> Outcome {
         if db.silences.contains(&ctx.channel, self.canons.get(cmd).ok_or(Unknown)?) {
             Err(Unauthorized)
         } else {
@@ -127,7 +129,7 @@ impl Commands {
                     let key = self.keys.get(cmd).ok_or(Unknown)?;
                     let x = self.stash.get_mut(*key).ok_or(Unknown)?;
                     
-                    if x.auth() > ctx.auth {
+                    if x.auth() > db.auth(ctx, irc) {
                         Err(Unauthorized)
                     } else if !x.fits(args.len()) {
                         Err(InvalidArgs)

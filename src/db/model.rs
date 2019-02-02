@@ -2,6 +2,7 @@
 use std::time::SystemTime;
 use chrono::{DateTime, Utc};
 use std::borrow::ToOwned;
+use std::hash::{Hash, Hasher};
 use xmlrpc::Value;
 
 use crate::db::*;
@@ -113,11 +114,12 @@ pub struct NameGen {
 #[derive(Identifiable, Insertable, Queryable)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Page {
-    pub id: String,
+    pub id:         String,
     pub created_at: DateTime<Utc>,
     pub created_by: String,
-    pub rating: i32,
-    pub title: String
+    pub rating:     i32,
+    pub title:      String,
+    pub updated:    SystemTime
 }
 
 impl Default for Page {
@@ -127,13 +129,14 @@ impl Default for Page {
             created_at: Utc::now(),
             created_by: String::default(),
             rating:     i32::default(),
-            title:      String::default()
+            title:      String::default(),
+            updated:    SystemTime::now()
         }
     }
 }
 
 impl Page {
-    pub fn build(val: &Value) -> Option<Page> {
+    pub fn build(val: &Value, updated: SystemTime) -> Option<Page> {
         let obj = val.as_struct()?;
         let created_at = DateTime::parse_from_rfc3339(obj.get("created_at")?.as_str()?)
             .ok()?
@@ -142,13 +145,24 @@ impl Page {
         let id = obj.get("fullname")?.as_str()?.to_owned();
         let rating = obj.get("rating")?.as_i32()?;
         let title = obj.get("title")?.as_str()?.to_owned();
-        Some(Self { created_at, created_by, id, rating, title })
+        Some(Self { created_at, created_by, id, rating, title, updated })
     }
 
-    pub fn tagged<T: FromIterator<String>>(val: &Value) -> Option<(Self, T)> {
-        let tags = val.as_struct()?.get("tags")?.as_array()?.into_iter()
-            .filter_map(Value::as_str).map(ToOwned::to_owned).collect();
-        Some((Page::build(val)?, tags))
+    pub fn tagged<T: FromIterator<Tag>>(val: &Value, updated: SystemTime) -> Option<(Self, T)> {
+        let page = Page::build(val, updated)?;
+        let tags = val
+            .as_struct()?
+            .get("tags")?
+            .as_array()?
+            .into_iter()
+            .filter_map(Value::as_str)
+            .map(|tag| Tag { 
+                name: tag.to_owned(), 
+                page_id: page.id.to_owned(), 
+                updated
+            })
+            .collect();
+        Some((page, tags))
     }
 }
 
@@ -165,9 +179,22 @@ pub struct Attribution {
 
 #[belongs_to(Page)]
 #[table_name = "tag"]
-#[derive(Associations, Insertable, Queryable, Default)]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Associations, Insertable, Queryable)]
+#[derive(Debug, Clone, PartialOrd, Ord, Eq)]
 pub struct Tag {
     pub page_id: String,
-    pub name:    String
+    pub name:    String,
+    pub updated: SystemTime
+}
+
+impl PartialEq for Tag {
+    fn eq(&self, other: &Tag) -> bool {
+        self.page_id == other.page_id && self.name == other.name
+    }
+}
+impl Hash for Tag {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.page_id.hash(state);
+        self.name.hash(state);
+    }
 }

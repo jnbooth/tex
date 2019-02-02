@@ -1,4 +1,7 @@
+use diesel::pg::upsert::excluded;
+
 use super::*;
+use crate::db::memo;
 
 pub struct Memo {
     shortcut: bool
@@ -18,7 +21,7 @@ impl Command for Memo {
     fn fits(&self, i: usize) -> bool { 
         if self.shortcut { i >= 2 } else { i != 2 }
     }
-    fn auth(&self) -> i32 { 0 }
+    fn auth(&self) -> u8 { 0 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         if self.shortcut {
@@ -89,9 +92,9 @@ impl Memo {
 
     pub fn get(&self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> { 
         Ok(
-            db::memo::table
-                .filter(db::memo::channel.eq(&ctx.channel))
-                .filter(db::memo::user.eq(user))
+            memo::table
+                .filter(memo::channel.eq(&ctx.channel))
+                .filter(memo::user.eq(user))
             .first::<db::Memo>(&db.conn())?
             .message
         )
@@ -99,10 +102,10 @@ impl Memo {
 
     pub fn remove(&mut self, user: &str, ctx: &Context, db: &Db) -> Result<String, Error> {
         Ok(
-            diesel::delete(db::memo::table
-                .filter(db::memo::channel.eq(&ctx.channel))
-                .filter(db::memo::user.eq(user)))
-            .returning(db::memo::message)
+            diesel::delete(memo::table
+                .filter(memo::channel.eq(&ctx.channel))
+                .filter(memo::user.eq(user)))
+            .returning(memo::message)
             .get_result(&db.conn())?
         )
     }
@@ -113,11 +116,11 @@ impl Memo {
             user:    user.to_owned(),
             message: message.to_owned()
         };
-        diesel::insert_into(db::memo::table)
+        diesel::insert_into(memo::table)
             .values(&memo)
-            .on_conflict((db::memo::channel, db::memo::user))
+            .on_conflict((memo::channel, memo::user))
             .do_update()
-            .set(db::memo::message.eq(message))
+            .set(memo::message.eq(excluded(memo::message)))
             .execute(&db.conn())?;
         Ok(())
     }

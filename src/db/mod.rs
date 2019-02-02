@@ -3,7 +3,7 @@ use diesel::query_dsl::{LoadQuery, RunQueryDsl};
 use diesel::pg::PgConnection;
 use diesel::pg::upsert::excluded;
 use diesel::r2d2::ConnectionManager;
-use hashbrown::{HashSet, HashMap};
+use hashbrown::HashMap;
 use multimap::MultiMap;
 use r2d2::PooledConnection;
 use reqwest::Client;
@@ -18,10 +18,11 @@ mod model;
 pub mod pages;
 mod schema;
 
-use crate::wikidot::diff::DiffReceiver;
+use crate::background::diff::DiffReceiver;
 use crate::logging::Logged;
 use crate::local::LocalMap;
-use crate::{Context, IO, env, util};
+use crate::{Context, env, util};
+use crate::output::Output;
 use crate::wikidot::Wikidot;
 use self::ban::Bans;
 
@@ -43,10 +44,6 @@ pub struct Db {
     pub tells:     MultiMap<String, Tell>,
     pub wiki:      Wikidot,
 
-    pub authors:   HashSet<String>,
-    pub authors_r: Option<DiffReceiver<String>>,
-    pub loaded:    HashSet<String>,
-    pub loaded_r:  Option<DiffReceiver<String>>,
     pub titles:    HashMap<String, String>,
     pub titles_r:  Option<DiffReceiver<(String, String)>>,
 
@@ -76,11 +73,7 @@ impl Db {
             tells:     MultiMap::new(),
             wiki:      Wikidot::new(),
 
-            authors:   HashSet::new(),
-            loaded:    HashSet::new(),
             titles:    HashMap::new(),
-            authors_r: None,
-            loaded_r:  None,
             titles_r:  None,
 
             pool
@@ -90,30 +83,17 @@ impl Db {
     }
 
     pub fn conn(&self) -> Conn {
-        self.pool.clone().get().expect("Failed to get connection from database pool")
+        self.pool.get().expect("Failed to get connection from database pool")
+    }
+
+    pub fn title(&self, page: &Page) -> String {
+        match self.titles.get(&page.id) {
+            None        => page.title.to_owned(),
+            Some(title) => format!("{}: {}", page.title, title)
+        }
     }
 
     pub fn listen(&mut self) {
-        if let Some(authors_r) = &self.authors_r {
-            loop {
-                match authors_r.try_recv() {
-                    Err(Empty)        => break,
-                    Err(Disconnected) => { self.authors_r = None; break },
-                    Ok((k, true))     => { self.authors.insert(k); },
-                    Ok((k, false))    => { self.authors.remove(&k); }
-                }
-            }
-        }
-        if let Some(loaded_r) = &self.loaded_r {
-            loop {
-                match loaded_r.try_recv() {
-                    Err(Empty)        => break,
-                    Err(Disconnected) => { self.titles_r = None; break },
-                    Ok((k, true))     => { self.loaded.insert(k); },
-                    Ok((k, false))    => { self.loaded.remove(&k); }
-                }
-            }
-        }
         if let Some(titles_r) = &self.titles_r {
             loop {
                 match titles_r.try_recv() {
@@ -142,7 +122,6 @@ impl Db {
     pub fn reload(&mut self) -> QueryResult<()> {
         let conn = self.conn();
         #[cfg(not(test))] { self.bans = Bans::build(); }
-        self.loaded = page::table.select(page::id).load(&conn)?.into_iter().collect();
         self.silences = silence::table.load(&conn)?.into_iter().collect();
         self.reminders = self.retrieve::<DbReminder,_,_,_,_>
             (reminder::table, |x| (x.user.to_owned(), Reminder::from(x)))?;
@@ -151,14 +130,13 @@ impl Db {
         Ok(())
     }
 
-    pub fn auth(&self, nick: &str) -> i32 {
-        let user = nick.to_lowercase();
-        if user == self.nick {
+    pub fn auth<T: Output>(&self, ctx: &Context, irc: &T) -> u8 {
+        if ctx.user == self.nick {
             5
-        } else if user == self.owner_ {
+        } else if ctx.user == self.owner_ {
             4
         } else {
-            0
+            irc.auth(ctx)
         }
     }
 
@@ -206,8 +184,8 @@ impl Db {
                 .on_conflict((seen::channel, seen::user))
                 .do_update()
                 .set((
-                    seen::latest.eq(message),
-                    seen::latest_time.eq(SystemTime::now()),
+                    seen::latest.eq(excluded(seen::latest)),
+                    seen::latest_time.eq(excluded(seen::latest_time)),
                     seen::total.eq(seen::total + 1)
                 ))
             .execute(&self.conn())?;
@@ -220,59 +198,6 @@ impl Db {
             .filter(seen::channel.eq(&channel.to_lowercase()))
             .filter(seen::user.eq(&nick.to_lowercase()))
         .first(&self.conn())
-    }
-
-    fn download_diff(&mut self, added: Vec<String>, deleted: Vec<String>) -> IO<()> {
-        let conn = self.conn();
-        for x in deleted {
-            diesel::delete(page::table.filter(page::id.eq(&x))).execute(&conn)?;
-            self.loaded.remove(&x);
-        }
-        let titles = self.titles.clone();
-        let mut pages = Vec::new();
-        let mut tags = Vec::new();
-        self.wiki.walk(&added, &self.client, |title, mut page, pagetags: Vec<String>| {
-            if let Some(title) = titles.get(&page.id) {
-                page.title.push_str(": ");
-                page.title.push_str(title);
-            }
-            pages.push(page);
-            for tag in pagetags {
-                tags.push(Tag { name: tag, page_id: title.to_owned() });
-            }
-            Ok(())
-        })?;
-        for chunk in pages.chunks(10_000) {
-            diesel::insert_into(page::table)
-                .values(chunk)
-                .on_conflict(page::id)
-                .do_update()
-                .set(page::rating.eq(excluded(page::rating)))
-                .execute(&conn)?;
-        }
-        for chunk in tags.chunks(20_000) {
-            diesel::insert_into(tag::table)
-                .values(chunk)
-                .on_conflict_do_nothing()
-                .execute(&conn)?;
-        }
-        for x in added {
-            self.loaded.insert(x);
-        }
-        Ok(())
-    }
-
-
-    pub fn download(&mut self, titles: &HashSet<String>) -> IO<()> {
-        let added = titles
-            .difference(&self.loaded)
-            .map(ToOwned::to_owned)
-            .collect();
-        let deleted = self.loaded
-            .difference(&titles)
-            .map(ToOwned::to_owned)
-            .collect();
-        self.download_diff(added, deleted)
     }
 }
 

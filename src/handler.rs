@@ -19,7 +19,7 @@ pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O
 -> Result<(), IrcError> {
     db.listen();
     let text = message.to_string();
-    match Context::build(db, message.to_owned()) {
+    match Context::build(message.to_owned()) {
         None      => print!("{}", text),
         Some(ctx) => {
             match message.command {
@@ -52,7 +52,7 @@ pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O
                     } else {
                         log_part(ASK, &text);
                         for command in commands {
-                            run(cmds, command, irc, &ctx, db)?
+                            run(cmds, command, &ctx, db, irc)?
                         }
                     }
                     db.add_seen(&ctx, &msg).log(trace!());
@@ -100,7 +100,7 @@ fn suggest(suggestions: &[String]) -> String {
     }
 }
 
-fn run<O: Output>(cmds: &mut Commands, message: &str, irc: &O, ctx: &Context, db: &mut Db) 
+fn run<O: Output>(cmds: &mut Commands, message: &str, ctx: &Context, db: &mut Db, irc: &O) 
 -> Result<(), IrcError> {
     let (cmd, args): (String, Vec<&str>) = match util::split_on(" ", message) {
         None         => (message.to_lowercase(), Vec::new()),
@@ -111,14 +111,14 @@ fn run<O: Output>(cmds: &mut Commands, message: &str, irc: &O, ctx: &Context, db
             [val] => match val.parse::<usize>() {
                 Ok(i) if i > 0 => match db.choices.get(i - 1).map(ToOwned::to_owned) {
                     None    => irc.respond(ctx, Reply("That isn't one of my options.".to_owned())),
-                    Some(x) => run(cmds, &x, irc, ctx, db)
+                    Some(x) => run(cmds, &x, ctx, db, irc)
                 },
                 _ => irc.respond(ctx, Reply(cmds.usage(&cmd)))
             },
             _ => irc.respond(ctx, Reply(cmds.usage(&cmd)))
         }
     } else {
-        match cmds.run(&cmd, &args, ctx, db) {
+        match cmds.run(&cmd, &args, ctx, db, irc) {
             Ok(responses)    => {
                 for response in responses { 
                     irc.respond(ctx, response)?;

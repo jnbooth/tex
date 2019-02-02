@@ -4,36 +4,30 @@ use select::document::Document;
 use select::node::Node;
 use select::predicate::{Class, Name, Predicate, Text};
 
-use crate::{IO, db};
-use crate::wikidot::diff::{Diff, DiffResult, DiffSender};
+use crate::IO;
+use super::diff::{Diff, DiffResult, DiffSender};
 
 pub struct TitlesDiff {
-    client: Client,
     sender: DiffSender<(String, String)>,
     titles: HashSet<(String, String)>
 }
 
 impl Diff<(String, String)> for TitlesDiff {
-    fn new(sender: DiffSender<(String, String)>, _: &db::Pool) -> Self {
-        Self {
-            sender,
-            client: Client::new(),
-            titles: HashSet::new()
-        }
+    fn new(sender: DiffSender<(String, String)>) -> Self {
+        Self { sender, titles: HashSet::new() }
     }
     fn cache(&self) -> &HashSet<(String, String)> {
         &self.titles
     }
-    fn refresh(&self) -> IO<HashSet<(String, String)>> {
-        let mut pages: Vec<String> = 
-            (2..6)
-                .map(|i| format!("http://scp-wiki.wikidot.com/scp-series-{}", i))
-                .collect();
+    fn refresh(&self, cli: &Client) -> IO<HashSet<(String, String)>> {
+        let mut pages: Vec<String> = (2..6)
+            .map(|i| format!("http://scp-wiki.wikidot.com/scp-series-{}", i))
+            .collect();
         pages.push("http://scp-wiki.wikidot.com/scp-series".to_string());
         pages.push("http://www.scp-wiki.net/joke-scps".to_string());
         let mut titles = HashSet::new();
         for page in pages {
-            let doc = Document::from_read(self.client.get(&page).send()?)?;
+            let doc = Document::from_read(cli.get(&page).send()?)?;
             for el in doc.find(Class("series").descendant(Name("li"))) {
                 if let Some((k, v)) = parse_title(&el) {
                     if v != "[ACCESS DENIED]" {

@@ -1,30 +1,31 @@
 use hashbrown::HashSet;
+use reqwest::Client;
 use std::hash::Hash;
 use std::sync::mpsc::{Receiver, SendError, Sender, channel};
 
-use crate::{IO, db};
+use crate::IO;
 
 pub type DiffReceiver<K> = Receiver<(K, bool)>;
 pub type DiffSender<K>   = Sender<(K, bool)>;
 pub type DiffResult<K>   = Result<(), SendError<(K, bool)>>;
 
 pub trait Diff<K: Clone + Eq + Hash + Send + Sync + 'static> {
-    fn new(sender: DiffSender<K>, pool: &db::Pool) -> Self;
+    fn new(sender: DiffSender<K>) -> Self;
     fn cache(&self) -> &HashSet<K>;
     fn send(&self, k: K, v: bool) -> DiffResult<K>;
-    fn refresh(&self) -> IO<HashSet<K>>;
+    fn refresh(&self, cli: &Client) -> IO<HashSet<K>>;
     fn update(&mut self, new: HashSet<K>);
 
-    fn build(pool: &db::Pool) -> IO<(Self, DiffReceiver<K>)> where Self: Sized {
+    fn build(cli: &Client) -> IO<(Self, DiffReceiver<K>)> where Self: Sized {
         let (sender, receiver) = channel();
-        let mut new = Self::new(sender, pool);
-        new.update(new.refresh()?);
+        let mut new = Self::new(sender);
+        new.update(new.refresh(cli)?);
         Ok((new, receiver))
     }
 
-    fn diff(&mut self) -> IO<()> {
+    fn diff(&mut self, cli: &Client) -> IO<()> {
         let old = self.cache();
-        let new = self.refresh()?;
+        let new = self.refresh(cli)?;
         for added in new.difference(&old) {
             self.send(added.clone(), true)?;
         }

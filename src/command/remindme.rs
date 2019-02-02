@@ -2,6 +2,7 @@ use regex::Regex;
 use std::time::{Duration, SystemTime};
 
 use super::*;
+use crate::db::{Reminder, reminder};
 
 pub struct Remindme {
     offset: Regex
@@ -13,7 +14,7 @@ impl Command for Remindme {
     }
     fn usage(&self) -> String { "[<days>d][<hours>h][<minutes>m] message".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 2 }
-    fn auth(&self) -> i32 { 0 }
+    fn auth(&self) -> u8 { 0 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let offset = self.parse_offset(&args[0]).ok_or(InvalidArgs)?;
@@ -56,12 +57,12 @@ fn next<'r, 't>(groups: &mut regex::Matches<'r, 't>) -> Option<u32> {
 
 
 fn add_reminder(message: &str, when: SystemTime, ctx: &Context, db: &mut Db) -> QueryResult<()> {
-    let reminder = db::Reminder {
+    let reminder = Reminder {
         user:    ctx.user.to_owned(),
         when,
         message: message.to_owned()
     };
-    diesel::insert_into(db::reminder::table).values(&reminder).execute(&db.conn())?;
+    diesel::insert_into(reminder::table).values(&reminder).execute(&db.conn())?;
     db.reminders.insert(ctx.user.to_owned(), reminder);
     Ok(())
 }

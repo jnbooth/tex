@@ -1,4 +1,5 @@
 use super::*;
+use crate::db::{memo, seen, tell};
 
 pub struct Forget;
 
@@ -8,25 +9,21 @@ impl Command for Forget {
     }
     fn usage(&self) -> String { "<user>".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 1 }
-    fn auth(&self) -> i32 { 3 }
+    fn auth(&self) -> u8 { 4 }
 
-    fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
+    fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         let nick = args[0];
-        if ctx.auth > db.auth(&nick) {
-            delete_user(&nick, db)?;
-            Ok(vec![Action(format!("forgets {}.", nick))])
-        } else {
-            Ok(vec![Reply("Your authorization rank is not high enough to do that.".to_owned())])
-        }
+        delete_user(&nick, db)?;
+        Ok(vec![Action(format!("forgets {}.", nick))])
     }
 }
 
 fn delete_user(nick: &str, db: &mut Db) -> QueryResult<()> {
     let conn = db.conn();
     let user = nick.to_lowercase();
-    diesel::delete(db::memo::table.filter(db::memo::user.eq(&user))).execute(&conn)?;
-    diesel::delete(db::seen::table.filter(db::seen::user.eq(&user))).execute(&conn)?;
-    diesel::delete(db::tell::table.filter(db::tell::target.eq(&user))).execute(&conn)?;
-    diesel::delete(db::tell::table.filter(db::tell::sender.eq(&user))).execute(&conn)?;
+    diesel::delete(memo::table.filter(memo::user.eq(&user))).execute(&conn)?;
+    diesel::delete(seen::table.filter(seen::user.eq(&user))).execute(&conn)?;
+    diesel::delete(tell::table.filter(tell::target.eq(&user))).execute(&conn)?;
+    diesel::delete(tell::table.filter(tell::sender.eq(&user))).execute(&conn)?;
     Ok(())
 }

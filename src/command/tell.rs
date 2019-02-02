@@ -1,6 +1,7 @@
 use std::time::SystemTime;
 
 use super::*;
+use crate::db::tell;
 
 pub struct Tell;
 
@@ -10,7 +11,7 @@ impl Command for Tell {
     }
     fn usage(&self) -> String { "<user> <message>".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 2 }
-    fn auth(&self) -> i32 { 0 }
+    fn auth(&self) -> u8 { 0 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let (nick, msg) = args.split_first().unwrap();
@@ -27,7 +28,7 @@ fn add_tell(message: &str, target_nick: &str, ctx: &Context, db: &mut Db) -> Que
         time:    SystemTime::now(),
         message: message.to_owned()
     };
-    diesel::insert_into(db::tell::table).values(&tell).execute(&db.conn())?;
+    diesel::insert_into(tell::table).values(&tell).execute(&db.conn())?;
     db.tells.insert(target, tell);
     Ok(())
 }

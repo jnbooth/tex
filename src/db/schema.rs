@@ -29,6 +29,7 @@ table! {
         created_by -> Text,
         rating -> Int4,
         title -> Text,
+        updated -> Timestamp,
     }
 }
 
@@ -64,6 +65,7 @@ table! {
     tag (page_id, name) {
         page_id -> Text,
         name -> Text,
+        updated -> Timestamp,
     }
 }
 
@@ -77,7 +79,13 @@ table! {
     }
 }
 
-joinable!(attribution -> page (page_id));
+table! {
+    timer (name) {
+        name -> Text,
+        minutes -> Int4,
+    }
+}
+
 joinable!(tag -> page (page_id));
 
 allow_tables_to_appear_in_same_query!(
@@ -90,4 +98,5 @@ allow_tables_to_appear_in_same_query!(
     silence,
     tag,
     tell,
+    timer,
 );

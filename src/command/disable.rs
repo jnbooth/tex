@@ -1,4 +1,5 @@
 use super::*;
+use crate::db::{Silence, silence};
 
 pub struct Disable {
     enable: bool,
@@ -11,7 +12,7 @@ impl Command for Disable {
     }
     fn usage(&self) -> String { "<command>".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 1 }
-    fn auth(&self) -> i32 { 2 }
+    fn auth(&self) -> u8 { 2 }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let cmd = args.join(" ").to_lowercase();
@@ -41,13 +42,13 @@ impl Disable {
         let conn = db.conn();
         if self.enable {
             db.silences.remove(&ctx.channel, &cmd);
-            diesel::delete(db::silence::table
-                .filter(db::silence::channel.eq(&ctx.channel))
-                .filter(db::silence::command.eq(&cmd))
+            diesel::delete(silence::table
+                .filter(silence::channel.eq(&ctx.channel))
+                .filter(silence::command.eq(&cmd))
             ).execute(&conn)?;
         } else {
-            let silence = db::Silence { channel: ctx.channel.to_owned(), command: cmd.to_owned() };
-            diesel::insert_into(db::silence::table)
+            let silence = Silence { channel: ctx.channel.to_owned(), command: cmd.to_owned() };
+            diesel::insert_into(silence::table)
                 .values(&silence)
                 .on_conflict_do_nothing()
             .execute(&conn)?;

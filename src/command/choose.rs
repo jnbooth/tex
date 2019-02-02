@@ -14,7 +14,7 @@ impl Command for Choose {
     }
     fn usage(&self) -> String { "<choices, separated, by, commas>".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 1 }
-    fn auth(&self) -> i32 { 0 }
+    fn auth(&self) -> u8 { 0 }
 
     fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {
         let choices = args.join(" ");
