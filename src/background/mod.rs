@@ -36,7 +36,7 @@ fn benchmark(ins: Instant) -> u64 {
 
 fn thread<F>(label: &'static str, pool: Pool, mut f: F) 
 where F: Send + 'static + FnMut(&Client, &Conn, &Wikidot) -> IO<()> {
-    let lower = label .to_lowercase();
+    let lower = label.to_lowercase();
     let missing_timer = format!("Missing timer: {}", label);
     let client = Client::new();
     let wiki = Wikidot::new();

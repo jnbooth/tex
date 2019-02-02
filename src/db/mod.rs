@@ -1,7 +1,9 @@
-use diesel::prelude::*;
-use diesel::query_dsl::RunQueryDsl;
-use diesel::pg::PgConnection;
+use diesel::{Column, ExpressionMethods};
+use diesel::pg::{Pg, PgConnection};
 use diesel::pg::upsert::excluded;
+use diesel::prelude::*;
+use diesel::query_builder::{AsChangeset, QueryFragment};
+use diesel::query_dsl::RunQueryDsl;
 use diesel::r2d2::ConnectionManager;
 use hashbrown::HashMap;
 use multimap::MultiMap;
@@ -192,8 +194,8 @@ impl Db {
                 .on_conflict((seen::channel, seen::user))
                 .do_update()
                 .set((
-                    seen::latest.eq(excluded(seen::latest)),
-                    seen::latest_time.eq(excluded(seen::latest_time)),
+                    upsert(seen::latest),
+                    upsert(seen::latest_time),
                     seen::total.eq(seen::total + 1)
                 ))
             .execute(&self.conn())?;
@@ -207,6 +209,11 @@ impl Db {
             .filter(seen::user.eq(&nick.to_lowercase()))
         .first(&self.conn())
     }
+}
+
+pub fn upsert<T: Column + ExpressionMethods + Copy>(t: T) 
+-> impl AsChangeset<Changeset=impl QueryFragment<Pg>, Target=<T as Column>::Table> {
+    t.eq(excluded(t))
 }
 
 #[cfg(not(test))]

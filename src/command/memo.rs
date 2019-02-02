@@ -1,7 +1,5 @@
-use diesel::pg::upsert::excluded;
-
 use super::*;
-use crate::db::memo;
+use crate::db::{memo, upsert};
 
 pub struct Memo {
     shortcut: bool
@@ -120,7 +118,7 @@ impl Memo {
             .values(&memo)
             .on_conflict((memo::channel, memo::user))
             .do_update()
-            .set(memo::message.eq(excluded(memo::message)))
+            .set(upsert(memo::message))
             .execute(&db.conn())?;
         Ok(())
     }
