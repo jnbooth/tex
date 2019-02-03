@@ -24,14 +24,11 @@ pub fn handle<O: Output>(message: message::Message, cmds: &mut Commands, irc: &O
         Some(ctx) => {
             match message.command {
                 JOIN(_, _, _) => {
-                    match &db.bans {
-                        None     => print!("{}", text),
-                        Some(xs) => match xs.get_ban(&ctx) {
-                            None         => print!("{}", text),
-                            Some(reason) => {
-                                log_part(WARNING, &text);
-                                irc.respond(&ctx, Ban(reason))?;
-                            }
+                    match db.get_ban(&ctx) {
+                        None         => print!("{}", text),
+                        Some(reason) => {
+                            log_part(WARNING, &text);
+                            irc.respond(&ctx, Ban(reason))?;
                         }
                     }
                 },

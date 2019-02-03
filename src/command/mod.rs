@@ -126,8 +126,8 @@ impl Commands {
                 ("help", [query]) => { Ok(vec![Reply(self.usage(query))]) }
                 ("help", _)       => Err(InvalidArgs),
                 _ => {
-                    let key = self.keys.get(cmd).ok_or(Unknown)?;
-                    let x = self.stash.get_mut(*key).ok_or(Unknown)?;
+                    let &key = self.keys.get(cmd).ok_or(Unknown)?;
+                    let x = self.stash.get_mut(key).ok_or(Unknown)?;
                     
                     if x.auth() > db.auth(ctx, irc) {
                         Err(Unauthorized)

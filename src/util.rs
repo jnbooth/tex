@@ -1,5 +1,7 @@
 use chrono::{DateTime, Duration, NaiveDate, Utc};
+use multimap::MultiMap;
 use percent_encoding::utf8_percent_encode;
+use std::hash::Hash;
 use std::iter::*;
 use std::string::ToString;
 use std::time::SystemTime;
@@ -140,7 +142,6 @@ pub fn pop_filter<F, T>(vec: &mut Vec<T>, filter: F) -> Option<T> where F: Fn(&T
     None
 }
 
-/*
 pub fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: &K, v: &V) -> bool {
     if let Some(vec) = map.get_vec_mut(k) {
         let mut i = 0;
@@ -155,7 +156,6 @@ pub fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: &K, v: &V)
     }
     false
 }
-*/
 
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

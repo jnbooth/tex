@@ -1,21 +1,46 @@
 use chrono::NaiveDate;
 use chrono::offset::Local;
 use hashbrown::HashSet;
-use multimap::MultiMap;
 use reqwest::Client;
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Class, Name};
+use std::iter::*;
 use std::borrow::ToOwned;
 
-use crate::{Context, IO, env};
+use crate::{IO, env};
+use super::diff::{Diff, DiffResult, DiffSender};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Ban {
-    nicks:  HashSet<String>,
-    hosts:  HashSet<String>,
-    status: Option<NaiveDate>,
-    reason: String
+pub struct BansDiff {
+    sender: DiffSender<(String, Ban)>,
+    bans: HashSet<(String, Ban)>,
+    page: String
+}
+
+impl Diff<(String, Ban)> for BansDiff {
+    fn new(sender: DiffSender<(String, Ban)>) -> Self {
+        Self { sender, bans: HashSet::new(), page: env::get("BAN_PAGE") }
+    }
+    fn cache(&self) -> &HashSet<(String, Ban)> {
+        &self.bans
+    }
+    fn refresh(&self, cli: &Client) -> IO<HashSet<(String, Ban)>> {
+        Ok(parse_bans(&Document::from_read(cli.get(&self.page).send()?)?))
+    }
+    fn send(&self, k: (String, Ban), v: bool) -> DiffResult<(String, Ban)> {
+        self.sender.send((k, v))
+    }
+    fn update(&mut self, bans: HashSet<(String, Ban)>) {
+        self.bans = bans;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Ban {
+    nicks:      Vec<String>,
+    hosts:      Vec<String>,
+    status:     Option<NaiveDate>,
+    pub reason: String
 }
 impl Ban {
     pub fn build(node: &Node) -> Option<Self> {
@@ -43,33 +68,14 @@ impl Ban {
             Some(t) => t >= Local::today().naive_local()
         }
     }
-    pub fn matches(&self, nick: &str, host: &str) -> bool {
+    #[allow(clippy::ptr_arg)] // Vec<String>, annoyingly, can only match against &String
+    pub fn matches(&self, nick: &String, host: &String) -> bool {
         self.nicks.contains(nick) || self.hosts.contains(host)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Bans(MultiMap<String, Ban>);
-
-impl Bans {
-    pub fn build() -> Option<Bans> {
-        Some(Bans(load_bans(&env::opt("BAN_PAGE")?).ok()?))
-    }
-    pub fn get_ban(&self, ctx: &Context) -> Option<String> {
-        let bans = self.0.get_vec(&ctx.channel)?;
-        let ban = bans.into_iter()
-            .find(|x| x.active() && x.matches(&ctx.user, &ctx.host))?;
-        Some(ban.reason.to_owned())
-    }
-}
-
-fn load_bans(page: &str) -> IO<MultiMap<String, Ban>> {
-    let doc = Document::from_read(Client::new().get(page).send()?)?;
-    Ok(parse_bans(&doc))
-}
-
-fn parse_bans(doc: &Document) -> MultiMap<String, Ban> {
-    let mut bans = MultiMap::new();
+fn parse_bans(doc: &Document) -> HashSet<(String, Ban)> {
+    let mut bans = HashSet::new();
     for node in doc.find(Class("wiki-content-table")) {
         if let Some(title) = node.find(Name("th")).next() {
             let chantext = title.text().to_owned();
@@ -78,7 +84,7 @@ fn parse_bans(doc: &Document) -> MultiMap<String, Ban> {
                 if let Some(ban) = Ban::build(&tr) {
                     if ban.active() {
                         for chan in chans.clone() {
-                            bans.insert(chan.to_owned(), ban.to_owned())
+                            bans.insert((chan.to_owned(), ban.to_owned()));
                         }
                     }
                 }
@@ -86,14 +92,4 @@ fn parse_bans(doc: &Document) -> MultiMap<String, Ban> {
         }
     }
     bans
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn loads() {
-        Bans::build().expect("Failed to load bans.");
-    }
 }

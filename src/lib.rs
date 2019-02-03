@@ -57,8 +57,10 @@ pub fn run() -> IO<()> {
     client.send_cap_req(&CAPABILITIES)?;
     client.identify()?;
 
-    reactor.
-        register_client_with_handler(client, move |c, m| handler::handle(m, &mut cmds, c, &mut db));
+    reactor.register_client_with_handler(
+        client, 
+        move |c, m| handler::handle(m, &mut cmds, c, &mut db)
+    );
     reactor.run()?;
 
     Ok(())

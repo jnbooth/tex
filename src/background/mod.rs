@@ -9,17 +9,28 @@ use crate::db::{Conn, Db, Pool, timer};
 use crate::wikidot::Wikidot;
 use crate::logging::*;
 
+mod diff;
+mod titles;
 mod attributions;
+mod bans;
 mod pages;
-pub mod diff;
-pub mod titles;
 
+pub use self::bans::Ban;
+pub use self::diff::DiffReceiver;
+
+use self::bans::BansDiff;
 use self::diff::Diff;
 use self::titles::TitlesDiff;
 
 pub fn spawn(pool: Pool, db: &mut Db) -> IO<()> {
     thread("attributions", pool.clone(), attributions::update);
     thread("pages", pool.clone(), pages::update);
+
+    let (mut bans, bans_r) = BansDiff::build();
+    bans.update(bans.refresh(&db.client)?);
+    db.bans   = bans.cache().clone().into_iter().collect();
+    db.bans_r = Some(bans_r);
+    thread("bans", pool.clone(), move |cli,_,_| bans.diff(cli));
 
     let (mut titles, titles_r) = TitlesDiff::build();
     titles.update(titles.refresh(&db.client)?);

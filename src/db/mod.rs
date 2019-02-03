@@ -15,18 +15,16 @@ use std::sync::mpsc::TryRecvError::{Empty, Disconnected};
 use std::time::SystemTime;
 
 #[macro_use] mod model_macro;
-mod ban;
 mod model;
 pub mod pages;
 mod schema;
 
 use crate::{Context, IO, env, util};
-use crate::background::diff::DiffReceiver;
 use crate::logging::*;
 use crate::local::LocalMap;
 use crate::output::Output;
 use crate::wikidot::Wikidot;
-use self::ban::Bans;
+use crate::background::{Ban, DiffReceiver};
 
 pub use self::model::*;
 pub use self::schema::*;
@@ -39,13 +37,14 @@ pub struct Db {
     pub owner: String,
     owner_:    String,
 
-    pub bans:      Option<Bans>,
     pub choices:   Vec<String>,
     pub reminders: MultiMap<String, Reminder>,
     pub silences:  LocalMap<Silence>,
     pub tells:     MultiMap<String, Tell>,
     pub wiki:      Wikidot,
 
+    pub bans:      MultiMap<String, Ban>,
+    pub bans_r:    Option<DiffReceiver<(String, Ban)>>,
     pub titles:    HashMap<String, String>,
     pub titles_r:  Option<DiffReceiver<(String, String)>>,
 
@@ -68,13 +67,14 @@ impl Db {
             nick:      env::get("IRC_NICK").to_lowercase(),
             owner_:    owner.to_lowercase(),
             owner,
-            bans:      None,
             choices:   Vec::new(),
             reminders: MultiMap::new(),
             silences:  LocalMap::new(),
             tells:     MultiMap::new(),
             wiki:      Wikidot::new(),
 
+            bans:      MultiMap::new(),
+            bans_r:    None,
             titles:    HashMap::new(),
             titles_r:  None,
 
@@ -116,6 +116,16 @@ impl Db {
                 }
             }
         }
+        if let Some(bans_r) = &self.bans_r {
+            loop {
+                match bans_r.try_recv() {
+                    Err(Empty)          => break,
+                    Err(Disconnected)   => { self.bans_r = None; break },
+                    Ok(((k, v), false)) => { util::multi_remove(&mut self.bans, &k, &v); },
+                    Ok(((k, v), true))  => { self.bans.insert(k, v); }
+                }
+            }
+        }
     }
     
     #[cfg(not(test))]
@@ -127,7 +137,6 @@ impl Db {
     #[cfg(not(test))]
     pub fn reload(&mut self) -> IO<()> {
         let conn = self.conn()?;
-        #[cfg(not(test))] { self.bans = Bans::build(); }
         self.silences = silence::table.load(&conn)?.into_iter().collect();
         self.reminders = self.retrieve::<DbReminder,_,_,_,_>
             (reminder::table, &conn, |x| (x.user.to_owned(), Reminder::from(x)))?;
@@ -148,6 +157,13 @@ impl Db {
         } else {
             irc.auth(ctx)
         }
+    }
+
+    pub fn get_ban(&self, ctx: &Context) -> Option<String> {
+        let bans = self.bans.get_vec(&ctx.channel)?;
+        let ban = bans.into_iter()
+            .find(|x| x.active() && x.matches(&ctx.user, &ctx.host))?;
+        Some(ban.reason.to_owned())
     }
 
     pub fn get_reminders(&mut self, ctx: &Context) -> Option<Vec<Reminder>> {
