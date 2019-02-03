@@ -13,6 +13,7 @@ pub enum Error {
     Ambiguous(i64, Vec<String>),
     Throw(failure::Error)
 }
+
 impl From<std::num::ParseIntError> for Error {
     fn from(_: std::num::ParseIntError) -> Self {
         NoResults
@@ -33,15 +34,6 @@ impl From<getopts::Fail> for Error {
         InvalidArgs
     }
 }
-impl From<diesel::result::Error> for Error {
-    fn from(e: diesel::result::Error) -> Self {
-        use diesel::result::Error::*;
-        match e {
-            NotFound => NoResults,
-            _        => Throw(failure::Error::from(e))
-        }
-    }
-}
 impl From<serde_json::error::Error> for Error {
     fn from(e: serde_json::error::Error) -> Self {
         ParseErr(failure::Error::from(e))
@@ -52,6 +44,15 @@ impl From<chrono::format::ParseError> for Error {
         ParseErr(failure::Error::from(e))
     }
 }
+impl From<diesel::result::Error> for Error {
+    fn from(e: diesel::result::Error) -> Self {
+        use diesel::result::Error::*;
+        match e {
+            NotFound => NoResults,
+            _        => Throw(failure::Error::from(e))
+        }
+    }
+}
 impl From<std::time::SystemTimeError> for Error {
     fn from(e: std::time::SystemTimeError) -> Self {
         Throw(failure::Error::from(e))
@@ -59,6 +60,11 @@ impl From<std::time::SystemTimeError> for Error {
 }
 impl From<xmlrpc::Error> for Error {
     fn from(e: xmlrpc::Error) -> Self {
+        Throw(failure::Error::from(e))
+    }
+}
+impl From<r2d2::Error> for Error {
+    fn from(e: r2d2::Error) -> Self {
         Throw(failure::Error::from(e))
     }
 }

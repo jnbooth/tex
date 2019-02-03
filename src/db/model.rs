@@ -23,12 +23,12 @@ impl Local for Memo {
 
 model!{Reminder; DbReminder; "reminder"; {
     pub user:    String,
-    pub when:    SystemTime,
+    pub time:    SystemTime,
     pub message: String
 }}
 impl Default for Reminder {
     fn default() -> Self {
-        Self { user: String::default(), when: SystemTime::now(), message: String::default() }
+        Self { user: String::default(), time: SystemTime::now(), message: String::default() }
     }
 }
 

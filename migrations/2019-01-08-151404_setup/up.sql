@@ -8,7 +8,7 @@ CREATE TABLE "memo" (
 CREATE TABLE "reminder" (
   "id"       serial  PRIMARY KEY,
   "user"     text  NOT NULL,
-  "when"     timestamp  NOT NULL,
+  "time"     timestamp  NOT NULL,
   "message"  text  NOT NULL
 );
 

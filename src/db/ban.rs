@@ -64,8 +64,12 @@ impl Bans {
 }
 
 fn load_bans(page: &str) -> IO<MultiMap<String, Ban>> {
-    let mut bans = MultiMap::new();
     let doc = Document::from_read(Client::new().get(page).send()?)?;
+    Ok(parse_bans(&doc))
+}
+
+fn parse_bans(doc: &Document) -> MultiMap<String, Ban> {
+    let mut bans = MultiMap::new();
     for node in doc.find(Class("wiki-content-table")) {
         if let Some(title) = node.find(Name("th")).next() {
             let chantext = title.text().to_owned();
@@ -81,14 +85,14 @@ fn load_bans(page: &str) -> IO<MultiMap<String, Ban>> {
             }
         }
     }
-    Ok(bans)
+    bans
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test] #[ignore]
+    #[test]
     fn loads() {
         Bans::build().expect("Failed to load bans.");
     }

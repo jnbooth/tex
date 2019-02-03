@@ -16,11 +16,9 @@ pub trait Diff<K: Clone + Eq + Hash + Send + Sync + 'static> {
     fn refresh(&self, cli: &Client) -> IO<HashSet<K>>;
     fn update(&mut self, new: HashSet<K>);
 
-    fn build(cli: &Client) -> IO<(Self, DiffReceiver<K>)> where Self: Sized {
+    fn build() -> (Self, DiffReceiver<K>) where Self: Sized {
         let (sender, receiver) = channel();
-        let mut new = Self::new(sender);
-        new.update(new.refresh(cli)?);
-        Ok((new, receiver))
+        (Self::new(sender), receiver)
     }
 
     fn diff(&mut self, cli: &Client) -> IO<()> {

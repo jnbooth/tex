@@ -15,20 +15,15 @@ impl Command for Tell {
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let (nick, msg) = args.split_first().unwrap();
-        add_tell(&msg.join(" "), nick, ctx, db)?;
+        let target = nick.to_lowercase();
+        let tell = db::Tell {
+            sender:  ctx.nick.to_owned(),
+            target:  target.to_owned(),
+            time:    SystemTime::now(),
+            message: msg.join(" ")
+        };
+        diesel::insert_into(tell::table).values(&tell).execute(&db.conn()?)?;
+        db.tells.insert(target, tell);
         Ok(vec![Action(format!("writes down {}'s message for {}.", &ctx.nick, nick))])
     }
-}
-
-fn add_tell(message: &str, target_nick: &str, ctx: &Context, db: &mut Db) -> QueryResult<()> {
-    let target = target_nick.to_lowercase();
-    let tell = db::Tell {
-        sender:  ctx.nick.to_owned(),
-        target:  target.to_owned(),
-        time:    SystemTime::now(),
-        message: message.to_owned()
-    };
-    diesel::insert_into(tell::table).values(&tell).execute(&db.conn())?;
-    db.tells.insert(target, tell);
-    Ok(())
 }

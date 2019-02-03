@@ -39,7 +39,7 @@ impl Disable {
     }
     
     pub fn set_enabled(&self, cmd: &str, ctx: &Context, db: &mut Db) -> Result<(), Error> {
-        let conn = db.conn();
+        let conn = db.conn()?;
         if self.enable {
             db.silences.remove(&ctx.channel, &cmd);
             diesel::delete(silence::table

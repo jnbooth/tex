@@ -42,6 +42,7 @@ pub struct Api {
 
 fn init(pool: Pool) -> IO<Db> {
     let mut db = Db::new(pool.clone());
+    db.reload().expect("Error loading database");
     background::spawn(pool, &mut db)?;
     Ok(db)
 }

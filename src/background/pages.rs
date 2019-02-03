@@ -11,17 +11,17 @@ use crate::db::{attribution, page, tag};
 
 pub fn update(cli: &Client, conn: &Conn, wiki: &Wikidot) -> IO<()> {
     let updated = SystemTime::now();
-    let mut pages = Vec::new();
-    let mut tags = Vec::new();
-    wiki.walk(updated, &wiki.list(cli)?, cli, |page, mut pagetags| {
-        pages.push(page);
-        tags.append(&mut pagetags);
-        Ok(())
-    })?;
-
-    for chunk in pages.chunks(10_000) {
+    let titles = wiki.list(cli)?;
+    for chunk in titles.chunks(5000) {
+        let mut pages = Vec::new();
+        let mut tags = Vec::new();
+        wiki.walk(updated, &chunk, cli, |page, mut pagetags| {
+            pages.push(page);
+            tags.append(&mut pagetags);
+            Ok(())
+        })?;
         diesel::insert_into(page::table)
-            .values(chunk)
+            .values(pages)
             .on_conflict(page::id)
             .do_update()
             .set((
@@ -32,10 +32,8 @@ pub fn update(cli: &Client, conn: &Conn, wiki: &Wikidot) -> IO<()> {
                 upsert(page::updated)
             ))
             .execute(conn)?;
-    }
-    for chunk in tags.chunks(20_000) {
         diesel::insert_into(tag::table)
-            .values(chunk)
+            .values(tags)
             .on_conflict((tag::page_id, tag::name))
             .do_update()
             .set(upsert(tag::updated))

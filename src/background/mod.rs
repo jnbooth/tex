@@ -21,7 +21,8 @@ pub fn spawn(pool: Pool, db: &mut Db) -> IO<()> {
     thread("attributions", pool.clone(), attributions::update);
     thread("pages", pool.clone(), pages::update);
 
-    let (mut titles, titles_r) = TitlesDiff::build(&db.client)?;
+    let (mut titles, titles_r) = TitlesDiff::build();
+    titles.update(titles.refresh(&db.client)?);
     db.titles   = titles.cache().clone().into_iter().collect();
     db.titles_r = Some(titles_r);
     thread("titles", pool, move |cli,_,_| titles.diff(cli));
@@ -29,8 +30,8 @@ pub fn spawn(pool: Pool, db: &mut Db) -> IO<()> {
     Ok(())
 }
 
-fn benchmark(ins: Instant) -> u64 {
-    let dur = ins.elapsed();
+fn benchmark(time: Instant) -> u64 {
+    let dur = time.elapsed();
     dur.as_secs() * 1000 + u64::from(dur.subsec_millis())
 }
 

@@ -1,5 +1,5 @@
 use irc::client::prelude::*;
-use std::time::SystemTime;
+use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Context {
@@ -7,7 +7,7 @@ pub struct Context {
     pub nick:    String,
     pub host:    String,
     pub user:    String,
-    pub time:    SystemTime
+    pub time:    Instant
 }
 
 impl Context {
@@ -17,15 +17,13 @@ impl Context {
         let nick    = prefix.split('!').next()?.to_owned();
         let host    = prefix.split('@').last()?.to_owned();
         let user    = nick.to_lowercase();
-        let time    = SystemTime::now();
+        let time    = Instant::now();
 
         Some(Self { channel, nick, host, user, time })
     }
     pub fn since(&self) -> String {
-        match self.time.elapsed() {
-            Err(_) => "now ".to_owned(),
-            Ok(x)  => format!("{}.{:02}s ", x.as_secs(), x.subsec_millis() / 10)
-        }
+        let dur = self.time.elapsed();
+        format!("{}.{:02}s ", dur.as_secs(), dur.subsec_millis() / 10)
     }
     #[cfg(test)]
     pub fn mock(channel: &str, nick: &str) -> Self {
@@ -34,7 +32,7 @@ impl Context {
              nick:    nick.to_owned(),
              host:    String::new(),
              user:    nick.to_lowercase(),
-             time:    SystemTime::now()
+             time:    Instant::now()
         }
     }
 }
@@ -46,7 +44,7 @@ impl Default for Context {
              nick:    String::default(),
              host:    String::default(),
              user:    String::default(),
-             time:    SystemTime::now()
+             time:    Instant::now()
         }
     }
 }

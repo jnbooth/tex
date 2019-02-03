@@ -11,7 +11,7 @@ impl Command for Reload {
     fn auth(&self) -> u8 { 3 }
 
     fn run(&mut self, _: &[&str], _: &Context, db: &mut Db) -> Outcome {
-        db.reload()?;
+        db.reload().map_err(Throw)?;
         Ok(vec![Action("reloads its database.".to_owned())])
     }
 }

@@ -50,16 +50,16 @@ impl Define {
         let page = Document::from_read(
             cli.get(&format!("http://ninjawords.com/{}", util::encode(query))).send()?
         )?;
-        let mut defs = MultiMap::new();
-        let mut article = String::new();
         let word = page
             .find(Class("title-word"))
             .next()
-            .ok_or_else(||ParseErr(err_msg("Missing title-word")))?
-            .text()
-            .trim()
-            .to_owned();
-        for node in page.find(Name("dd")) {
+            .ok_or_else(||ParseErr(err_msg("Missing title-word")))?;
+        Ok(self.parse(word.text().trim(), &page))
+    }
+    fn parse(&self, word: &str, doc: &Document) -> String {
+        let mut defs = MultiMap::new();
+        let mut article = String::new();
+        for node in doc.find(Name("dd")) {
             match node.attr("class") {
                 Some("article") => article = node.text(),
                 _ => if let Some(entry) = node.find(Class("definition")).next() {
@@ -70,11 +70,9 @@ impl Define {
                 }
             }
         }
-        Ok(stringify(&word, &defs))
+        stringify(word, &defs)
     }
-
 }
-
 
 fn stringify(word: &str, defs: &MultiMap<String, String>) -> String {
     let mut s = String::new();

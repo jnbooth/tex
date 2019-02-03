@@ -37,7 +37,7 @@ table! {
     reminder (id) {
         id -> Int4,
         user -> Text,
-        when -> Timestamp,
+        time -> Timestamp,
         message -> Text,
     }
 }

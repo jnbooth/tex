@@ -18,8 +18,14 @@ impl Command for Remindme {
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let offset = self.parse_offset(&args[0]).ok_or(InvalidArgs)?;
-        let when = SystemTime::now() + offset;
-        add_reminder(&args[1..].join(" "), when, ctx, db)?;
+        let time = SystemTime::now() + offset;
+        let reminder = Reminder {
+            user:    ctx.user.to_owned(),
+            time,
+            message: args[1..].join(" ")
+        };
+        diesel::insert_into(reminder::table).values(&reminder).execute(&db.conn()?)?;
+        db.reminders.insert(ctx.user.to_owned(), reminder);
         Ok(vec![Action(format!("writes down {}'s reminder.", &ctx.nick))])
     }
 }
@@ -53,18 +59,6 @@ fn yield_offset(d: u32, h: u32, m: u32) -> Option<Duration> {
 
 fn next<'r, 't>(groups: &mut regex::Matches<'r, 't>) -> Option<u32> {
     groups.next()?.as_str().parse().ok()
-}
-
-
-fn add_reminder(message: &str, when: SystemTime, ctx: &Context, db: &mut Db) -> QueryResult<()> {
-    let reminder = Reminder {
-        user:    ctx.user.to_owned(),
-        when,
-        message: message.to_owned()
-    };
-    diesel::insert_into(reminder::table).values(&reminder).execute(&db.conn())?;
-    db.reminders.insert(ctx.user.to_owned(), reminder);
-    Ok(())
 }
 
 

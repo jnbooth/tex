@@ -3,7 +3,7 @@ use diesel::dsl::sum;
 use getopts::{Matches, Options};
 
 use super::*;
-use crate::db::{Page, page, pages};
+use crate::db::{Conn, Page, page, pages};
 use crate::util;
 
 pub struct Search {
@@ -20,13 +20,13 @@ impl Command for Search {
 
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         let opts = self.opts.parse(args)?;
-        let conn = db.conn();
+        let conn = db.conn()?;
 
         let size = pages::filter(&opts, page::table.count())?.get_result(&conn)?;
 
         match size {
             0 => Err(NoResults),
-            1 => Ok(vec![Reply(self.show_result(&opts, db)?)]),
+            1 => Ok(vec![Reply(self.show_result(&opts, &conn, db)?)]),
             _ if opts.opt_present("u") => {
                 let authors = pages::filter(&opts, page::table
                     .select(page::created_by)
@@ -71,8 +71,8 @@ impl Search {
         Self { opts: pages::options() }
     }
 
-    fn show_result(&self, opts: &Matches, db: &mut Db) -> Result<String, Error> {
-        let page: Page = pages::filter(opts, page::table)?.first(&db.conn())?;
+    fn show_result(&self, opts: &Matches, conn: &Conn, db: &mut Db) -> Result<String, Error> {
+        let page: Page = pages::filter(opts, page::table)?.first(conn)?;
         Ok(format!(
             "\x02{}\x02 (written {} ago by {}; \x02{}\x02) - http://{}/{}",
             db.title(&page),

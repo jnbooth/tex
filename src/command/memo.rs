@@ -93,7 +93,7 @@ impl Memo {
             memo::table
                 .filter(memo::channel.eq(&ctx.channel))
                 .filter(memo::user.eq(user))
-            .first::<db::Memo>(&db.conn())?
+            .first::<db::Memo>(&db.conn()?)?
             .message
         )
     }
@@ -104,7 +104,7 @@ impl Memo {
                 .filter(memo::channel.eq(&ctx.channel))
                 .filter(memo::user.eq(user)))
             .returning(memo::message)
-            .get_result(&db.conn())?
+            .get_result(&db.conn()?)?
         )
     }
 
@@ -119,7 +119,7 @@ impl Memo {
             .on_conflict((memo::channel, memo::user))
             .do_update()
             .set(upsert(memo::message))
-            .execute(&db.conn())?;
+            .execute(&db.conn()?)?;
         Ok(())
     }
 }

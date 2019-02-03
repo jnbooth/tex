@@ -19,9 +19,7 @@ impl Command for Author {
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let mut opts = self.opts.parse(args)?;
-        let free = opts.free.clone();
-        opts.free.clear();
-        let result = match free.as_slice() {
+        let result = match opts.free.split_off(0).as_slice() {
             []           => self.tally(&ctx.nick, &opts, db),
             [author_pat] => self.tally(author_pat, &opts, db),
             _            => Err(InvalidArgs)
@@ -36,7 +34,7 @@ impl Author {
     }
     
     fn tally(&self, author_pat: &str, opts: &Matches, db: &mut Db) -> Result<String, Error> {
-        let conn = db.conn();
+        let conn = db.conn()?;
         let mut authors = page::table
             .filter(page::created_by.ilike(author_pat))
             .select(page::created_by)
@@ -63,7 +61,7 @@ impl Author {
         let hubs_len = hubs.len();
         let art_len = art.len();
 
-        let mut all: Vec<Page> = [scps, tales, gois, hubs, art].concat();
+        let mut all = [scps, tales, gois, hubs, art].concat();
         all.sort();
         all.dedup();
 
@@ -106,8 +104,7 @@ impl Author {
         Ok(s)
     }
 
-    fn tagged(tag: &str, author: &str, opts: &Matches, conn: &Conn) 
-    -> Result<Vec<Page>, Error> {
+    fn tagged(tag: &str, author: &str, opts: &Matches, conn: &Conn) -> Result<Vec<Page>, Error> {
         Ok(pages::filter_by(author, pages::filter(opts, page::table
                 .filter(page::id.eq_any(
                     tag::table

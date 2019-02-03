@@ -11,9 +11,7 @@ pub fn encode(s: &str) -> String {
 }
 
 pub fn own(xs: &[&str]) -> Vec<String> {
-    xs.into_iter()
-        .map(ToString::to_string)
-        .collect()
+    xs.into_iter().map(ToString::to_string).collect()
 }
 
 pub fn trim(s: &str) -> String {
@@ -83,8 +81,8 @@ fn show_ago(amount: i64, s: &str) -> String {
     }
 }
 
-pub fn ago<T: DurationAgo>(when: T) -> String {
-    let dur = when.duration_ago();
+pub fn ago<T: DurationAgo>(time: T) -> String {
+    let dur = time.duration_ago();
     if dur.num_days() > 365 {
         show_ago(dur.num_days() / 365, "year")
     } else if dur.num_weeks() > 0 {
@@ -102,11 +100,11 @@ pub fn ago<T: DurationAgo>(when: T) -> String {
     }
 }
 
-pub fn show_time(when: SystemTime) -> String {
-    let time = humantime::format_rfc3339_seconds(
-        when - std::time::Duration::from_secs(60 * 60 * 8)
+pub fn show_time(time: SystemTime) -> String {
+    let str = humantime::format_rfc3339_seconds(
+        time - std::time::Duration::from_secs(60 * 60 * 8)
     ).to_string();
-    time[..time.len()-4].rsplit('T').collect::<Vec<&str>>().join(" ").replace("-", "/")
+    str[..str.len()-4].rsplit('T').collect::<Vec<&str>>().join(" ").replace("-", "/")
 }
 
 pub fn split_on<'a>(pat: &str, s: &'a str) -> Option<(&'a str, &'a str)> {
@@ -156,13 +154,6 @@ pub fn multi_remove<K: Eq + Hash, V: Eq>(map: &mut MultiMap<K, V>, k: &K, v: &V)
         }
     }
     false
-}
-
-pub fn since(when: SystemTime) -> Result<String, SystemTimeError> {
-    let secs = when.elapsed()?.as_secs();
-    Ok(humantime::format_duration(
-        Duration::from_secs(if secs < 60 { secs } else { secs / 60 * 60 })
-    ).to_string())
 }
 */
 

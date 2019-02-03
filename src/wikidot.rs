@@ -33,8 +33,7 @@ impl Wikidot {
 
     fn xml_rpc(&self, cli: &Client, method: &str, params: Vec<(&str, Value)>) 
     -> Result<Value, xmlrpc::Error> {
-        let req = cli.post(&self.rpc)
-            .header(AUTHORIZATION, self.auth.to_owned());
+        let req = cli.post(&self.rpc).header(AUTHORIZATION, self.auth.to_owned());
         xmlrpc::Request::new(method)
             .arg(Value::Struct(params.into_iter().map(|(k, v)| (k.to_owned(), v)).collect()))
             .call(req)
@@ -67,7 +66,7 @@ impl Wikidot {
             ("pages", Value::Array(vec![Value::from(title.to_owned())]))
         ]).ok()?;
         let (_, page) = res.as_struct()?.iter().next()?;
-        Some(i64::from(Page::build(page, SystemTime::now())?.rating))
+        Some(i64::from(Page::build(page, SystemTime::UNIX_EPOCH)?.rating))
     }
 
     pub fn walk<F>(&self, updated: SystemTime, titles: &[String], cli: &Client, mut f: F) -> IO<()> 
@@ -94,7 +93,7 @@ impl Wikidot {
 mod tests {
     use super::*;
 
-    #[test] #[ignore]
+    #[test]
     fn lists_pages() {
         env::load();
         let wiki = Wikidot::new();
