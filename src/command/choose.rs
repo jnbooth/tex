@@ -14,7 +14,7 @@ impl Command for Choose {
     }
     fn usage(&self) -> String { "<choices, separated, by, commas>".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 1 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {
         let choices = args.join(" ");
@@ -23,7 +23,7 @@ impl Command for Choose {
     }
 }
 
-impl Choose { pub fn new() -> Self { Self::default() } }
+impl Choose { #[inline] pub fn new() -> Self { Self::default() } }
 
 #[cfg(test)]
 mod tests {
@@ -39,7 +39,7 @@ mod tests {
         let args = choices.join(",");
         let set: HashSet<String> = own(&choices).into_iter().collect();
         let results: HashSet<String> = (0..crate::FUZZ)
-            .map(|_| choose.test(&args, &ctx, &mut db).expect("Error running command."))
+            .map(|_| choose.test(&args, &ctx, &mut db).expect("Error running command"))
             .collect();
         assert_eq!(set, results);
     }

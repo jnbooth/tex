@@ -20,6 +20,7 @@ pub mod pages;
 mod schema;
 
 use crate::{Context, IO, env, util};
+use crate::auth::Auth;
 use crate::logging::*;
 use crate::local::LocalMap;
 use crate::output::Output;
@@ -82,6 +83,7 @@ impl Db {
         }
     }
 
+    #[inline]
     pub fn conn(&self) -> Result<Conn, r2d2::Error> {
         self.pool.get()
     }
@@ -149,11 +151,10 @@ impl Db {
         Ok(())
     }
 
-    pub fn auth<T: Output>(&self, ctx: &Context, irc: &T) -> u8 {
-        if ctx.user == self.nick {
-            5
-        } else if ctx.user == self.owner_ {
-            4
+    #[inline]
+    pub fn auth<T: Output>(&self, ctx: &Context, irc: &T) -> Auth {
+        if ctx.user == self.nick || ctx.user == self.owner_ {
+            Auth::Owner
         } else {
             irc.auth(ctx)
         }
@@ -233,6 +234,7 @@ impl Db {
     }
 }
 
+#[inline]
 pub fn upsert<T: Column + ExpressionMethods + Copy>(t: T) 
 -> impl AsChangeset<Changeset=impl QueryFragment<Pg>, Target=T::Table> {
     t.eq(excluded(t))

@@ -4,6 +4,14 @@ use serde_json::{Map, Value};
 use super::*;
 use crate::util;
 
+const SEARCH_URL: &str = 
+"https://en.wikipedia.org/w/api.php?format=json\
+&formatversion=2&action=query&list=search&srlimit=1&srprop=&srsearch=";
+
+const ENTRY_URL: &str = 
+"https://en.wikipedia.org/w/api.php?format=json\
+&action=query&prop=extracts|links&pllimit=100&exintro&explaintext&redirects=1&pageids=";
+
 pub struct Wikipedia {
     parens: Regex
 }
@@ -14,7 +22,7 @@ impl Command for Wikipedia {
     }
     fn usage(&self) -> String { "<query>".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 1 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         Ok(vec![Reply(self.search(&args.join(" "), &db.client)?)])
@@ -24,29 +32,25 @@ impl Command for Wikipedia {
 impl Default for Wikipedia { fn default() -> Self { Self::new() } }
 
 impl Wikipedia {
+    #[inline]
     pub fn new() -> Self {
         Self {
             parens: Regex::new("\\s*\\([^()]+\\)").expect("Parens regex failed to compile")
         }
     }
+    #[inline]
     fn clean(&self, s: &str) -> String {
         self.parens.replace_all(&s.replace("(listen)", ""), "").replace("  ", " ")
     }
     
     fn search(&self, query: &str, cli: &reqwest::Client) -> Result<String, Error> {
         let searches = serde_json::from_reader(
-            cli.get(&format!(
-                "https://en.wikipedia.org/w/api.php?format=json&formatversion=2&action=query&list=search&srlimit=1&srprop=&srsearch={}",
-                encode(query)
-            )).send()?
+            cli.get(&format!("{}{}", SEARCH_URL, encode(query))).send()?
         )?;
         let page = parse_page(&searches)
             .ok_or_else(|| ParseErr(err_msg("Unable to parse results")))?;
         let entry = serde_json::from_reader(
-            cli.get(&format!(
-                "https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts|links&pllimit=100&exintro&explaintext&redirects=1&pageids={}",
-                encode(&page.to_string())
-            )).send()?
+            cli.get(&format!("{}{}", ENTRY_URL, encode(&page.to_string()))).send()?
         )?;
         self.get_entry(page, &entry)
             .ok_or_else(||ParseErr(err_msg("Unable to parse entry")))?
@@ -81,6 +85,7 @@ impl Wikipedia {
     }
 }
 
+#[inline]
 fn encode(s: &str) -> String {
     util::encode(&s.replace(" ", "_"))
 }

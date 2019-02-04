@@ -8,7 +8,7 @@ impl Command for Zyn {
     }
     fn usage(&self) -> String { "".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 0 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, _: &[&str], _: &Context, _: &mut Db) -> Outcome {
         Ok(vec![Reply("Marp.".to_owned())])

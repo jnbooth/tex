@@ -16,7 +16,7 @@ impl Command for Search {
     }
     fn usage(&self) -> String { "<query> [-a <author>] [-t <tag>] [-t <another>] [-< <before MM-DD-YYYY>] [-> <after MM-DD-YYYY>] [-e <exclude>] [-e <another>] [-u]".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 1 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         let opts = self.opts.parse(args)?;
@@ -67,6 +67,7 @@ impl Command for Search {
 }
 
 impl Search {
+    #[inline]
     pub fn new() -> Self {
         Self { opts: pages::options() }
     }

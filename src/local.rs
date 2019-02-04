@@ -13,36 +13,45 @@ pub struct LocalMap<T: Local + Eq + Hash>(HashMap<String, HashMap<String, T>>);
 
 #[allow(dead_code)]
 impl<T: Local + Eq + Hash> LocalMap<T> {
+    #[inline]
     pub fn new() -> Self {
         LocalMap(HashMap::new())
     }
+    #[inline]
     pub fn with_capacity(capacity: usize) -> LocalMap<T> {
         LocalMap(HashMap::with_capacity(capacity))
     }
+    #[inline]
     pub fn insert(&mut self, value: T) -> Option<T> {
         match self.0.entry(value.channel()) {
             Occupied(k) => k.into_mut().insert(value.obj(), value),
             Vacant(k)   => k.insert(HashMap::new()).insert(value.obj(), value)
         }
     }
+    #[inline]
     pub fn contains(&self, channel: &str, user: &str) -> bool {
         match self.0.get(channel) {
             None    => false,
             Some(x) => x.contains_key(user)
         }
     }
+    #[inline]
     pub fn get(&self, channel: &str, user: &str) -> Option<&T> {
         self.0.get(channel)?.get(user)
     }
+    #[inline]
     pub fn get_mut(&mut self, channel: &str, user: &str) -> Option<&mut T> {
         self.0.get_mut(channel)?.get_mut(user)
     }
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+    #[inline]
     pub fn remove(&mut self, channel: &str, user: &str) -> Option<T> {
         self.0.get_mut(channel)?.remove(user)
     }
+    #[inline]
     pub fn remove_by(&mut self, t: &T) -> Option<T> {
         self.remove(&t.channel(), &t.obj())
     }

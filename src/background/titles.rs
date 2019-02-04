@@ -70,3 +70,16 @@ fn parse_title(node: &Node) -> Option<(String, String)> {
     };
     Some((link.text().to_lowercase(), title))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util;
+
+    #[test]
+    fn parses_titles() {
+        let mut set = HashSet::new();
+        parse_page(&util::webpage("http://scp-wiki.wikidot.com/scp-series"), &mut set);
+        assert!(!set.is_empty());
+    }
+}

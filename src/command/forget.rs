@@ -9,7 +9,7 @@ impl Command for Forget {
     }
     fn usage(&self) -> String { "<user>".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 1 }
-    fn auth(&self) -> u8 { 4 }
+    fn auth(&self) -> Auth { Owner }
 
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         let nick = args[0];

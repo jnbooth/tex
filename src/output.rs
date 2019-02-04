@@ -5,6 +5,7 @@ use irc::client::data::user::AccessLevel::*;
 
 use crate::logging::*;
 use crate::Context;
+use crate::auth::Auth;
 
 use self::Response::*;
 
@@ -31,7 +32,7 @@ impl Response {
 }
 
 pub trait Output {
-    fn auth(&self, ctx: &Context) -> u8;
+    fn auth(&self, ctx: &Context) -> Auth;
     fn respond(&self, ctx: &Context, response: Response) -> Result<(), IrcError>;
 }
 
@@ -45,14 +46,14 @@ fn access(irc: &IrcClient, ctx: &Context) -> Option<AccessLevel> {
 }
 
 impl Output for IrcClient {
-    fn auth(&self, ctx: &Context) -> u8 {
+    fn auth(&self, ctx: &Context) -> Auth {
         match access(&self, ctx) {
-            None         => 0,
-            Some(Owner)  => 3,
-            Some(Admin)  => 3,
-            Some(Oper)   => 3,
-            Some(HalfOp) => 2,
-            Some(_)      => 1
+            Some(Owner)  => Auth::Op,
+            Some(Admin)  => Auth::Op,
+            Some(Oper)   => Auth::Op,
+            Some(HalfOp) => Auth::HalfOp,
+            Some(_)      => Auth::Anyone,
+            None         => Auth::Anyone
         }
     }
     fn respond(&self, ctx: &Context, response: Response) -> Result<(), IrcError> {
@@ -91,8 +92,8 @@ impl Output for IrcClient {
 pub struct Offline;
 
 impl Output for Offline {
-    fn auth(&self, _: &Context) -> u8 {
-        4
+    fn auth(&self, _: &Context) -> Auth {
+        Auth::Owner
     }
     fn respond(&self, ctx: &Context, response: Response) -> Result<(), IrcError> {
         match response {

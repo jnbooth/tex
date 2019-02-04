@@ -15,7 +15,7 @@ impl Command for Author {
     }
     fn usage(&self) -> String { "[<author>] [-t <tag>] [-t <another>] [-< <before MM-DD-YYYY>] [-> <after MM-DD-YYYY>] [-e <exclude>] [-e <another>]".to_owned() }
     fn fits(&self, _: usize) -> bool { true }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let mut opts = self.opts.parse(args)?;
@@ -29,6 +29,7 @@ impl Command for Author {
 }
 
 impl Author {
+    #[inline]
     pub fn new() -> Self {
         Self { opts: pages::options() }
     }
@@ -131,5 +132,21 @@ fn count(comma: bool, s: &mut String, size: usize, name: &str) -> bool {
             s.push_str("s");
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn counts() {
+        let mut s = String::new();
+        let mut comma = count(false, &mut s, 0, "SCP article");
+        comma = count(comma, &mut s, 1, "tale");
+        comma = count(comma, &mut s, 0, "GOI article");
+        comma = count(comma, &mut s, 5, "hub");
+        count(comma, &mut s, 8, "artwork page");
+        assert_eq!(s, "\u{2}1\u{2} tale, \u{2}5\u{2} hubs, \u{2}8\u{2} artwork pages");
     }
 }

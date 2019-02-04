@@ -12,7 +12,7 @@ impl Command for Disable {
     }
     fn usage(&self) -> String { "<command>".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 1 }
-    fn auth(&self) -> u8 { 2 }
+    fn auth(&self) -> Auth { HalfOp }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let cmd = args.join(" ").to_lowercase();
@@ -34,6 +34,7 @@ impl Command for Disable {
 }
 
 impl Disable {
+    #[inline]
     pub fn new(enable: bool, canons: HashMap<String, String>) -> Self {
         Self { enable, canons }
     }

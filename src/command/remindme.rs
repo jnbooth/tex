@@ -14,7 +14,7 @@ impl Command for Remindme {
     }
     fn usage(&self) -> String { "[<days>d][<hours>h][<minutes>m] message".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 2 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let offset = self.parse_offset(&args[0]).ok_or(InvalidArgs)?;
@@ -33,6 +33,7 @@ impl Command for Remindme {
 impl Default for Remindme { fn default() -> Self { Self::new() } }
 
 impl Remindme {
+    #[inline]
     pub fn new() -> Self {
         Self { offset: Regex::new("\\d+").expect("Offset regex failed to compile") }
     }  
@@ -53,10 +54,12 @@ impl Remindme {
     }
 }
 
+#[inline]
 fn yield_offset(d: u32, h: u32, m: u32) -> Option<Duration> {
     Some(Duration::from_secs(u64::from(60 * (m + 60 * (h + 24 * d)))))
 }
 
+#[inline]
 fn next<'r, 't>(groups: &mut regex::Matches<'r, 't>) -> Option<u32> {
     groups.next()?.as_str().parse().ok()
 }

@@ -14,7 +14,7 @@ impl Command for Google {
     }
     fn usage(&self) -> String { "<query>".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 1 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], _: &Context, db: &mut Db) -> Outcome {
         Ok(vec![Reply(self.search(&args.join(" "), &db.client)?)])

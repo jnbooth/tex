@@ -36,7 +36,7 @@ impl Command for Name {
     }
     fn usage(&self) -> String { "[-f|-m]".to_owned() }
     fn fits(&self, size: usize) -> bool { size <= 1 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], _: &Context, _: &mut Db) -> Outcome {
         let gender = match args {

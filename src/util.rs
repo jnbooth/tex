@@ -4,14 +4,16 @@ use percent_encoding::utf8_percent_encode;
 use std::hash::Hash;
 use std::iter::*;
 use std::string::ToString;
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 const CHARACTER_LIMIT: usize = 300;
 
+#[inline]
 pub fn encode(s: &str) -> String {
     utf8_percent_encode(s, percent_encoding::DEFAULT_ENCODE_SET).to_string()
 }
 
+#[inline]
 pub fn own(xs: &[&str]) -> Vec<String> {
     xs.into_iter().map(ToString::to_string).collect()
 }
@@ -27,6 +29,7 @@ pub fn trim(s: &str) -> String {
     content
 }
 
+#[inline]
 pub fn rating(i: i64) -> String {
     if i > 0 {
         format!("+{}", i)
@@ -109,6 +112,13 @@ pub fn show_time(time: SystemTime) -> String {
     str[..str.len()-4].rsplit('T').collect::<Vec<&str>>().join(" ").replace("-", "/")
 }
 
+#[inline]
+pub fn benchmark(time: Instant) -> u64 {
+    let dur = time.elapsed();
+    dur.as_secs() * 1000 + u64::from(dur.subsec_millis())
+}
+
+#[inline]
 pub fn split_on<'a>(pat: &str, s: &'a str) -> Option<(&'a str, &'a str)> {
     match s.find(pat) {
         None    => None,
@@ -163,4 +173,11 @@ pub enum Gender {
     Any,
     Female,
     Male
+}
+
+#[cfg(test)] #[inline]
+pub fn webpage(url: &str) -> select::document::Document {
+    select::document::Document::from_read(
+        reqwest::Client::new().get(url).send().expect(url)
+    ).expect(url)
 }

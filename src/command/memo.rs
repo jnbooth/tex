@@ -19,7 +19,7 @@ impl Command for Memo {
     fn fits(&self, i: usize) -> bool { 
         if self.shortcut { i >= 2 } else { i != 2 }
     }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         if self.shortcut {
@@ -74,6 +74,7 @@ impl Command for Memo {
 }
 
 impl Memo {
+    #[inline]
     pub fn new(shortcut: bool) -> Self {
         Self { shortcut }
     }

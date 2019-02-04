@@ -16,7 +16,7 @@ impl Command for LastCreated {
     }
     fn usage(&self) -> String { "".to_owned() }
     fn fits(&self, size: usize) -> bool { size == 0 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, _: &[&str], _: &Context, db: &mut Db) -> Outcome {
         last_created(&db)
@@ -49,4 +49,15 @@ fn last_created(db: &Db) -> Result<Vec<Response>, Error> {
         Ok(())
     }).map_err(Throw)?;
     Ok(responses)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_lc() {
+        let lc = last_created(&Db::default()).expect("Error loading Last Created");
+        assert_eq!(lc.len(), LIMIT);
+    }
 }

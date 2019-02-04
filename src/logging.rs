@@ -12,6 +12,7 @@ pub enum Level {
     ASK
 }
 
+#[inline]
 fn color(lvl: Level) -> u8 {
     match lvl {
         ERROR   => 31,
@@ -22,6 +23,7 @@ fn color(lvl: Level) -> u8 {
     }
 }
 
+#[inline]
 fn label(lvl: Level) -> &'static str {
     match lvl {
         ERROR   => "ERROR: ",

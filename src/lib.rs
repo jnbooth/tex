@@ -5,6 +5,7 @@ use std::io;
 use std::io::BufRead;
 
 #[macro_use] mod logging;
+mod auth;
 mod background;
 mod command;
 mod context;

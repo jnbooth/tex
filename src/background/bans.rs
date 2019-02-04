@@ -93,3 +93,15 @@ fn parse_bans(doc: &Document) -> HashSet<(String, Ban)> {
     }
     bans
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util;
+
+    #[test]
+    fn parses_bans() {
+        env::load();
+        assert!(!parse_bans(&util::webpage(&env::get("BAN_PAGE"))).is_empty());
+    }
+}

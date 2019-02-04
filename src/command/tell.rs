@@ -11,7 +11,7 @@ impl Command for Tell {
     }
     fn usage(&self) -> String { "<user> <message>".to_owned() }
     fn fits(&self, size: usize) -> bool { size >= 2 }
-    fn auth(&self) -> u8 { 0 }
+    fn auth(&self) -> Auth { Anyone }
 
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome {
         let (nick, msg) = args.split_first().unwrap();

@@ -2,6 +2,7 @@ use irc::client::prelude::Config;
 
 use crate::Api;
 
+#[inline]
 pub fn load() {
     match dotenv::dotenv() {
         Err(dotenv::Error::Io(_)) => (),
@@ -10,6 +11,7 @@ pub fn load() {
     }
 }
 
+#[inline]
 pub fn get(var: &str) -> String {
     std::env::var(var)
         .unwrap_or_else(|_|
@@ -17,6 +19,7 @@ pub fn get(var: &str) -> String {
         )
 }
 
+#[inline]
 pub fn opt(var: &str) -> Option<String> {
     let res = std::env::var(var).ok()?.trim().to_owned();
     if res.is_empty() { None } else { Some(res) }

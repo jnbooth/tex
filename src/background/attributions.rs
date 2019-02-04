@@ -34,3 +34,14 @@ pub fn update(cli: &Client, conn: &Conn, _: &Wikidot) -> IO<()> {
         .execute(conn)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util;
+
+    #[test]
+    fn parses_attributions() {
+        assert!(!parse_all(&util::webpage(URL)).is_empty());
+    }
+}

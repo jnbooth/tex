@@ -4,7 +4,7 @@ use reqwest::Client;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::IO;
+use crate::{IO, util};
 use crate::db::{Conn, Db, Pool, timer};
 use crate::wikidot::Wikidot;
 use crate::logging::*;
@@ -41,11 +41,6 @@ pub fn spawn(pool: Pool, db: &mut Db) -> IO<()> {
     Ok(())
 }
 
-fn benchmark(time: Instant) -> u64 {
-    let dur = time.elapsed();
-    dur.as_secs() * 1000 + u64::from(dur.subsec_millis())
-}
-
 fn thread<F>(label: &'static str, pool: Pool, mut f: F) 
 where F: Send + 'static + FnMut(&Client, &Conn, &Wikidot) -> IO<()> {
     let lower = label.to_lowercase();
@@ -56,7 +51,7 @@ where F: Send + 'static + FnMut(&Client, &Conn, &Wikidot) -> IO<()> {
         let now = Instant::now();
         let conn = pool.get().expect("Failed to get connection from database pool");
         f(&client, &conn, &wiki).log(trace!());
-        log(INFO, &format!("Scanned {} in {}ms.", label, benchmark(now)));
+        log(INFO, &format!("Scanned {} in {}ms.", label, util::benchmark(now)));
         let minutes: i32 = timer::table
             .filter(timer::name.eq(&lower))
             .select(timer::minutes)

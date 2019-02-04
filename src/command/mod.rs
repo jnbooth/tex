@@ -25,6 +25,7 @@ mod author;
 mod search;
 
 use crate::{Context, db, env};
+use crate::auth::*;
 use crate::db::{Db, Pool};
 use crate::error::*;
 use crate::logging::*;
@@ -35,7 +36,7 @@ use crate::util::own;
 trait Command {
     fn cmds(&self) -> Vec<String>;
     fn usage(&self) -> String;
-    fn auth(&self) -> u8;
+    fn auth(&self) -> Auth;
     fn fits(&self, size: usize) -> bool;
     fn run(&mut self, args: &[&str], ctx: &Context, db: &mut Db) -> Outcome;
     
@@ -142,7 +143,7 @@ impl Commands {
     }
 }
 
-
+#[inline]
 fn abbrev(s: &str) -> Vec<String> {
     (0..s.len()).rev().map(|i| s[..=i].to_owned()).collect()
 }
