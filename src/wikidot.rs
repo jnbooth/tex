@@ -100,4 +100,19 @@ mod tests {
         let list = wiki.list(&Client::new()).expect("Error loading pages");
         println!("{}", list.len());
     }
+
+    
+    #[test] #[ignore]
+    fn walks() {
+        env::load();
+        let cli = Client::new();
+        let wiki = Wikidot::new();
+        let list = wiki.list(&cli).expect("Error loading pages");
+        let pages = list[..10].into_iter().map(|x| Value::from(x.to_owned())).collect();
+        let res = wiki.xml_rpc(&cli, "pages.get_meta", vec![
+            ("site",  Value::from(wiki.site.to_owned())),
+            ("pages", Value::Array(pages))
+        ]).expect("failed to respond");
+        println!("{:?}", res);
+    }
 }
