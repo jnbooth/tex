@@ -101,12 +101,12 @@ fn stringify(word: &str, defs: &MultiMap<String, String>) -> String {
 mod tests {
     use super::*;
 
-    #[test]
+    #[test] #[ignore]
     fn defines_word() {
         assert_eq!(Define::new().test_def("gulch").unwrap(), "\x02gulch:\x02 \x1d(noun)\x1d \x021.\x02 A narrow V-shaped valley with a stream running through it. \x022.\x02 A remote town or village, lacking in infrastructure and equipment.");
     }
 
-    #[test]
+    #[test] #[ignore]
     fn not_found() {
         assert!(Define::new().test_def("shisno").is_err());
     }
